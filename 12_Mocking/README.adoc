@@ -1,0 +1,407 @@
+= ○ Mocking mit NSubstitute
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::root_dir[:root_dir: .]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+== Warum Mocking?
+
+Integration Tests prüfen das gesamte System inklusive Datenbank und Routing.
+Das ist wichtig, aber diese Tests sind vergleichsweise langsam und aufwendig aufzusetzen, besonders wenn wir gezielt Randfälle oder Fehlerzustände (z. B. "Datenbank nicht erreichbar", "Eintrag nicht gefunden") testen wollen.
+
+Echte Unit Tests zeichnen sich durch absolute Isolation aus.
+Wenn wir z. B. eine Controllerklasse testen wollen, wollen wir nur die Logik _des Controllers_ testen, nicht die Logik der darunterliegenden Schichten.
+
+Da unser Controller aber über Dependency Injection von einem Service (_IEventService_) abhängig ist, müssen wir diesen Service "vortäuschen". 
+Dieser Vorgang wird _Mocking_ genannt.
+Ein Mock ist ein Dummy-Objekt, das das Interface implementiert, aber keine echte Logik besitzt.
+Wir können dem Mock genau vorschreiben, wie er sich verhalten soll.
+
+Die Grafik stellt den Integration Test und den Unittest mit Mocking gegenüber.
+Der Integration Test testet alle Schichten, während mit Hilfe von Mocking darunterliegende Schichten "weggeschnitten" werden.
+
+image::{root_dir}/mocking_0924.png[]
+
+== Das Paket NSubstitute
+
+Für C# gibt es verschiedene Mocking-Frameworks. Wir verwenden _NSubstitute_, da es sich durch eine besonders klare, lesbare und flüssige Syntax auszeichnet.
+
+Um NSubstitute in einem Testprojekt zu verwenden, und _IQueryable_ zu mocken, müssen folgende Dependencies installiert werden:
+
+[source,xml]
+----
+<PackageReference Include="NSubstitute" Version="5.*" />
+<PackageReference Include="MockQueryable.NSubstitute" Version="10.*" />
+----
+
+=== Kurzreferenz zu NSubstitute
+
+[cols="55a,45a"]
+|====
+|Beispiel | Erklärung
+
+| 
+[source,csharp]
+----
+var mock = Substitute.For<IEventService>()
+----
+| Erstellt einen Mock
+
+| 
+[source,csharp]
+----
+mock
+.CreateContingent(Arg.Any<CreateContingentCmd>())
+.Returns(new Contingent(...));
+----
+| Liefert für jedes Argument, mit dem _CreateContingent_ aufgerufen wurde, einen bestimmten Wert zurück.
+
+| 
+[source,csharp]
+----
+mock
+.CreateContingent(Arg.Is<CreateContingentCmd>(
+    cmd => cmd.ShowId == 10))
+.Returns(new Contingent(...));
+----
+| Liefert für Argumente, dessen ShowId den Wert 10 hat, einen bestimmten Wert zurück.
+
+| 
+[source,csharp]
+----
+mock
+.CreateContingent(Arg.Any<CreateContingentCmd>())
+.Returns(opt => new Contingent(
+    ...,
+    opt.Arg<CreateContingentCmd>().AvailableTickets))
+----
+| Liefert für jedes Argument, mit dem _CreateContingent_ aufgerufen wurde, ein _Contingent_ mit dem Wert _AvailableTickets_, der im Parameter definiert wurde, zurück.
+
+| 
+[source,csharp]
+----
+mock
+.CreateContingent(Arg.Any<CreateContingentCmd>())
+.Throws(info => 
+    new EventServiceException("Error message"));
+----
+| Wirft für jedes Argument, mit dem _CreateContingent_ aufgerufen wurde, eine _EventServiceException_.
+
+| 
+[source,csharp]
+----
+mock
+.Received()
+.CreateContingent(Arg.Any<CreateContingentCmd>());
+----
+| Prüft, ob _CreateContingent_ mit einem beliebigen Argument aufgerufen wurde.
+  Wirft eine _ReceivedCallsException_, falls die Methode nie aufgerufen wurde.
+  Wird im _assert_ Teil verwendet.
+
+|====
+
+Dies ist nur ein kleiner Ausschnitt der Möglichkeiten.
+Mehr darüber gibt es auf link:https://nsubstitute.github.io[nsubstitute.github.io].
+
+== Mocken des DbContext im Servicetest
+
+[WARNING]
+====
+Das Mocken der _DbContext_ Klasse und der DbSets ist zwar möglich, es gibt allerdings Fehler, die der Test nicht aufdecken kann.
+Im Mock wird LINQ to objects verwendet, das DbSet verwendet aber LINQ to SQL.
+Fehler, die bei der Ausführung von LINQ to SQL entstehen wie "could not translate", die auch vom Ziel DBMS abhängig sind, werden nicht erkannt.
+
+Microsoft selbst empfiehlt die Verwendung der in-memory Datenbank oder die Verwendung des *repository patterns*.
+Wir diskutieren diesen Fall daher nur der Vollständigkeit halber, verwenden jedoch im Unterricht die SQLite in-memory Datenbank.
+====
+
+____
+Since only the DbSet itself is faked and the query is evaluated in-memory, this approach ends up being very similar to using the EF Core in-memory provider: both techniques execute query operators in .NET over an in-memory collection. As a result, this technique suffers from the same drawbacks as well: queries will behave differently (e.g. around case sensitivity) or will simply fail (e.g. because of provider-specific methods), raw SQL won't work and transactions will be ignored at best. As a result, this technique should generally be avoided for testing any query code.
+
+Quelle: https://learn.microsoft.com/en-us/ef/core/testing/choosing-a-testing-strategy#mocking-or-stubbing-dbcontext-and-dbset
+____
+
+Mit Hilfe des Paketes _MockQueryable.NSubstitute_ können wir auch einen Mock für den _DbContext_ erstellen.
+Die größte Herausforderung sind die DbSets, die im Datenbankcontext angegeben sind.
+Im _EventContext_ sind z. B. folgende Sets definiert:
+
+[source,csharp]
+----
+public class EventContext : DbContext
+{
+    public DbSet<Contingent> Contingents => Set<Contingent>();
+    public DbSet<Event> Events => Set<Event>();
+    public DbSet<Guest> Guests => Set<Guest>();
+    public DbSet<Show> Shows => Set<Show>();
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+    /* ... */
+}
+----
+
+Möchten wir nun einen Mock für den _EventContext_ erstellen, brauchen wir eine Möglichkeit, Fakedaten für Events, etc. zu liefern.
+Mit _BuildMockDbSet()_ bietet das Paket _MockQueryable.NSubstitute_ eine Extension für alle Collections an.
+
+[source,csharp]
+----
+var eventContextMock = Substitute.For<EventContext>();
+var events = new List<Event>
+{
+    new Event("Event") { Id = 1 }
+};
+var eventsMock = events.BuildMockDbSet();
+eventContextMock.Events.Returns(eventsMock);
+----
+
+[IMPORTANT]
+====
+_BuildMockDbSet()_ und _Returns()_ müssen getrennte Anweisungen sein. 
+Wird z. B. _eventContextMock.Events.Returns(events.BuildMockDbSet())_ geschrieben, wird eine _CouldNotSetReturnDueToNoLastCallException_ Exception geworfen.
+====
+
+Mit diesen Betrachtungen im Hintergrund können wir - sehr analog zum Test mit der SQLite in-memory Datenbank - unser Service testen.
+
+.link:../Eventmanager/Eventmanager.Test/EventServiceWithDbMockTests.cs[→ Eventmanager.Test/EventServiceWithDbMockTests.cs]
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Services;
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
+using MockQueryable.NSubstitute;
+using NSubstitute;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Test;
+
+public class EventServiceWithDbMockTests
+{
+    private readonly TimeProvider _timeProvider;
+    private readonly EventContext _db;
+
+    public EventServiceWithDbMockTests()
+    {
+        _timeProvider = new FakeTimeProvider(
+            new DateTimeOffset(2026, 3, 9, 14, 0, 0, TimeSpan.Zero));
+        _db = Substitute.For<EventContext>();
+    }
+
+    /// <summary>
+    /// myList.BuildMockDbSet() und db.MySet.db.Returns(myMock) müssen getrennte Anweisungen sein.
+    /// Mit dieser Methode können wir leichter einen Mock für ein DbSet erzeugen.
+    /// Verwendung: AssignMockDbSet(events, set => db.Events.Returns(set));
+    /// </summary>
+    private void AssignMockDbSet<T>(ICollection<T> data, Action<DbSet<T>> applyReturns) 
+        where T : class
+    {
+        var mockSet = data.BuildMockDbSet();
+        applyReturns(mockSet);
+    }
+    /// <summary>
+    /// Erstellt zentral alle fake DbSets.
+    /// </summary>
+    private void GenerateFixtures()
+    {
+        var events = new List<Event>
+        {
+            new Event("Event") { Id = 1 }
+        };
+        var shows = new List<Show>
+        {
+            new Show(events[0], new DateTime(2026, 3, 9, 14, 0, 0)) { Id = 1 }
+        };
+        var contingents = new List<Contingent>
+        {
+            new Contingent(shows[0], ContingentType.Rang, 10) { Id = 1 }
+        };
+        AssignMockDbSet(events, set => _db.Events.Returns(set));
+        AssignMockDbSet(shows, set => _db.Shows.Returns(set));
+        AssignMockDbSet(contingents, set => _db.Contingents.Returns(set));
+    }
+
+    [Fact]
+    public async Task CreateContingentCallsAddAndSaveChangesAsyncTest()
+    {
+        GenerateFixtures();
+
+        var service = new EventService(_db, _timeProvider, true);
+        var contingentCmd = new CreateContingentCmd(1, "Floor", 10);
+        await service.CreateContingent(contingentCmd);
+        _db.Received().Add(
+            Arg.Is<Contingent>(c => c.ContingentType == ContingentType.Floor));
+        await _db.Received().SaveChangesAsync();
+    }
+
+    [Theory]
+    [InlineData(999, "Floor", "Show 999 not found")]
+    [InlineData(1, "XXX", "not a valid contingent type")]
+    [InlineData(1, "Rang", "Show has already a contingent for")]
+    public async Task CreateContingentThrowsEventServiceExceptionTest(
+        int showId, string contingentType, string expectedErrorMessage)
+    {
+        GenerateFixtures();
+
+        var service = new EventService(_db, _timeProvider, true);
+        var contingentCmd = new CreateContingentCmd(showId, contingentType, 10);
+        var ex = await Assert.ThrowsAsync<EventServiceException>(
+            () => service.CreateContingent(contingentCmd));
+        Assert.Contains(expectedErrorMessage, ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+}
+----
+
+== Mocken des Services im Controllertest
+
+Das Prinzip des Mockens von Dependencies können wir auch auf Controller übertragen.
+Der _CategoriesController_ hat als Dependency das _EventService_.
+Da der Controller das Interface _IEventService_ anfordert, können wir mit NSubstitute eine Implementierung dieses Interfaces erstellen.
+
+[source,csharp]
+----
+public interface IEventService
+{
+    IQueryable<Contingent> Contingents { get; }
+    Task<Contingent> CreateContingent(CreateContingentCmd cmd);
+    Task UpdateContingent(UpdateContingentCmd cmd);
+    Task UpdateAvailableTickets(UpdateContingentAvailableTicketsCmd cmd);
+    Task DeleteContingent(int id);
+}
+----
+
+Während die Methoden einfach mit NSubstitute zu mocken sind, müssen wir das Property _Contingent_ genauer betrachten.
+Es ist vom Typ _IQueryable<Contingent>_.
+Dieser Typ wird von EF Core zum Bereitstellen von Datenbankabfragen verwendet.
+Daher brauchen wir hier wieder unser Paket _MockQueryable.NSubstitute_.
+Die Methode _BuildMock()_ kann eine Liste in ein _IQueryable_ umwandeln, das als Rückgabewert für das Property verwendet werden kann.
+Die GET Endpunkte des Controllers greifen auf _Contingents_ zu und erzeugen darüber ihre Daten.
+
+Eine konkrete Implementierung der Integrationtests zeigt die Verwendung.
+Die Tests sind überraschend kurz.
+Da wir den Servicelayer mocken, müssen wir die Dependencies des Services wie Datenbank, Timeprovider, etc. _nicht berücksichtigen_.
+Wir müssen für jeden Endpunkt nur 2 Tests schreiben:
+
+* Liefert der Controller, wenn die Methode _CreateContingent_ keine Exception wirft, einen positiven Statuscode (2xx)?
+* Liefert der Controller, wenn die Methode _CreateContingent_ eine Exception wirft, einen entsprechenden 4xx Statuscode (client error)?
+
+Die Businesslogik des Services kümmert uns nicht.
+Wir erstellen einfach eine Methode _CreateContingent_, die entweder einen Wert oder eine Fehlermeldung liefert.
+Damit wir bei den GET Endpunkten Daten im response body bekommen, erstellen wir einige (wenige) Musterdaten.
+
+.link:../Eventmanager/Eventmanager.Test/ContingentsControllerWithServiceMockTests.cs[→ Eventmanager.Test/ContingentsControllerWithServiceMockTests.cs]
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Dtos;
+using Eventmanager.Application.Services;
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using MockQueryable;
+using NSubstitute;
+using NSubstitute.ExceptionExtensions;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Test;
+
+public class ContingentsControllerWithServiceMockTests : IDisposable
+{
+    private readonly TestWebApplicationFactory<EventContext> _factory;
+    private readonly IEventService _eventServiceMock =
+        Substitute.For<IEventService>();
+    public ContingentsControllerWithServiceMockTests()
+    {
+        _factory = new TestWebApplicationFactory<EventContext>();
+        _factory.SubstituteService<IEventService>(provider => _eventServiceMock);
+    }
+    private void GenerateFixtures()
+    {
+        var events = new List<Event>
+        {
+            new Event("Event") { Id = 1 }
+        };
+        var shows = new List<Show>
+        {
+            new Show(events[0], new DateTime(2026, 3, 9, 14, 0, 0)) { Id = 1 }
+        };
+        var contingents = new List<Contingent>
+        {
+            new Contingent(shows[0], ContingentType.Rang, 10) { Id = 1 }
+        };
+        _eventServiceMock.Contingents.Returns(contingents.BuildMock());
+    }
+    /// <summary>
+    /// Checks whether GET /api/contingents/{id} returns HTTP 200
+    /// and a ContingentDto.
+    /// </summary>
+    [Fact]
+    public async Task GetContingentByIdReturns200WithDataTest()
+    {
+        GenerateFixtures();
+        var (response, contingent) =
+            await _factory.GetHttpContent<ContingentDto>("/api/contingents/1");
+        Assert.Equal(200, (int)response.StatusCode);
+        Assert.NotNull(contingent);
+        Assert.True(contingent.Id == 1);
+    }
+    /// <summary>
+    /// Checks whether POST /api/contingents returns HTTP 201
+    /// with ID and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task CreateContingentReturns201Test()
+    {
+        var command = new CreateContingentCmd(1, "Floor", 10);
+        _eventServiceMock.CreateContingent(
+            Arg.Any<CreateContingentCmd>()).Returns(opt =>
+                new Contingent(
+                    new Show(new Event("Event"),
+                    new DateTime(2026, 3, 9, 20, 0, 0)),
+                    ContingentType.Floor, 10)
+                { Id = 1 });
+
+        var (response, content) = await _factory.PostHttpContent(
+            "/api/contingents",
+            command);
+        await _eventServiceMock.Received().CreateContingent(
+            Arg.Any<CreateContingentCmd>());
+        Assert.Equal(201, (int)response.StatusCode);
+    }
+    /// <summary>
+    /// Checks whether POST /api/contingents returns HTTP 400
+    /// with the corresponding error message in the problem detail.
+    /// </summary>
+    [Fact]
+    public async Task CreateContingentReturns400IfCreateContingentThrowsEventServiceExceptionTest()
+    {
+        _eventServiceMock
+            .CreateContingent(Arg.Any<CreateContingentCmd>())
+            .Throws(info => new EventServiceException("Error message"));
+        var (response, content) = await _factory.PostHttpContent(
+            "/api/contingents",
+            new CreateContingentCmd(1, "Floor", 10));
+        await _eventServiceMock.Received().CreateContingent(
+            Arg.Any<CreateContingentCmd>());
+        Assert.Equal(400, (int)response.StatusCode);
+        Assert.True(_factory.ContentContainsErrorMessage(content, "Error message"));
+    }
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
+}
+
+----

@@ -1,0 +1,49 @@
+= API Entwicklung mit ASP.NET Core
+:doctype: book
+:toc: macro
+:toc-title: Inhaltsverzeichnis
+:pdf-page-size: a4
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:author: Michael Schletz
+:revdate: 8. März 2026
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+:leveloffset: 1
+
+toc::[]
+
+:root_dir: 01_Rest
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:root_dir: 02_ASP_Intro
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:root_dir: 03_Get_Routes
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:root_dir: 04_Post_Routes
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:root_dir: 05_Put_Patch_Delete_Routes
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:root_dir: 10_Service_Tests
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:root_dir: 11_Integration_Tests
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:root_dir: 12_Mocking
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:leveloffset: 0

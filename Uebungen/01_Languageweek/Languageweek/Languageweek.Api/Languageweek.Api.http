@@ -1,0 +1,81 @@
+@baseUrl = http://localhost:5080/api/languageweeks
+
+### ==============================================================================
+### 1. GET - ABFRAGE ALLER SPRACHWOCHEN
+### ==============================================================================
+
+### Erfolgsfall (200 OK): Liefert alle Sprachwochen mit leerem Array für Registrations
+GET {{baseUrl}}
+Accept: application/json
+
+### Erfolgsfall (200 OK): Liefert alle Sprachwochen mit befülltem Array für Registrations
+GET {{baseUrl}}?includeRegistrations=true
+Accept: application/json
+
+
+### ==============================================================================
+### 2. GET - ABFRAGE EINER SPRACHWOCHE
+### ==============================================================================
+
+### Erfolgsfall (200 OK): Lade Sprachwoche 1 (4AHIF, London)
+GET {{baseUrl}}/1
+Accept: application/json
+
+### ==============================================================================
+### 3. POST - NEUE SPRACHWOCHE ERSTELLEN (CreateLanguageWeekAsync)
+### ==============================================================================
+
+### Erfolgsfall (201 Created): Neue Sprachwoche für 4BHIF (Class ID 2) erstellen.
+# Laut Seed hat die 4BHIF noch keine Sprachwoche.
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "schoolclassId": 2,
+  "destinationId": 3, 
+  "from": "2036-07-01",
+  "to": "2036-07-08",
+  "teacherId": 4, 
+  "pricePerPerson": 950.00
+}
+
+### ==============================================================================
+### 4. PUT - SPRACHWOCHE AKTUALISIEREN (UpdateLanguageWeekAsync)
+### ==============================================================================
+
+### Erfolgsfall (204 NoContent): Sprachwoche 1 aktualisieren.
+# Ändert das Reiseziel auf 2 (Dublin) und den Preis auf 850.
+PUT {{baseUrl}}/1
+Content-Type: application/json
+{
+  "id": 1,
+  "schoolclassId": 1,
+  "destinationId": 2, 
+  "from": "2026-07-09",
+  "to": "2026-07-14",
+  "teacherId": 1, 
+  "pricePerPerson": 850.00
+}
+
+### ==============================================================================
+### 5. PATCH - PREIS AKTUALISIEREN (UpdateLanguageWeekPriceAsync)
+### ==============================================================================
+
+### Erfolgsfall (204 NoContent): Nur den Preis von Sprachwoche 2 anpassen.
+PATCH {{baseUrl}}/2/price
+Content-Type: application/json
+{
+  "id": 2,
+  "pricePerPerson": 1250.00
+}
+
+### ==============================================================================
+### 6. DELETE - SPRACHWOCHE LÖSCHEN (DeleteLanguageWeekAsync)
+### ==============================================================================
+
+### Erfolgsfall (204 NoContent): Löschen erzwingen (forceDelete=true).
+# Löscht die Sprachwoche und kaskadiert das Löschen der Registrierungen.
+DELETE {{baseUrl}}/3?forceDelete=true
+Accept: application/json
+
+

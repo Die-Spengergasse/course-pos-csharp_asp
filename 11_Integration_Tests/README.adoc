@@ -1,0 +1,336 @@
+= Integration Tests mit ASP.NET Core
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::root_dir[:root_dir: .]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+== Die Testpyramide
+
+Bisher haben wir Unittests kennengelernt.
+Sie prüfen, ob eine Methode ein definiertes Verhalten zeigt.
+Der Test läuft auf Codeebene ab, d. h. eine Klasse wird instanziert, die Methode aufgerufen und das Ergebnis wird verglichen.
+Das Triple A Schema (Arrange - Act - Assert) ist hier zu erwähnen.
+
+Diese Testart kann allerdings nicht alles prüfen.
+In ASP.NET Core haben wir z. B. mittels Attributes das Routingsystem definiert, und mit dem Serviceprovider werden abhängige Klassen zur Verfügung gestellt.
+Ein reines Instanzieren der Controllerklasse und überprüfen der Methode deckt keine Fehler in diesem Bereich auf.
+Wir brauchen also höherwertige Tests:
+
+.Quelle: https://medium.com/@nathankpeck/microservice-testing-introduction-347d2f74095e
+image::{root_dir}/integration_test_1553.png[]
+
+Der *Ingetration Test* ist - technisch gesehen - ein Unittest, der folgenden Ablauf hat:
+
+* Eine Datenbank wird für die Verwendung vorbereitet.
+* Ein Testserver wird gestartet.
+  Der Serviceprovider wird so angepasst, dass er auf die Testdatenbank verweist.
+* Ein HTTP Request wird an den Testserver gesandt.
+* Die Antwort des Servers wird ausgewertet.
+
+Das Schema _Arrange - Act - Assert_ ist auch hier erkennbar.
+
+== Integration Tests mit ASP.NET Core
+
+=== Das Paket _Microsoft.AspNetCore.Mvc.Testing_
+
+Das Durchführen eines Integration Tests erfordert mehr Vorbereitung als der klassische Unittest auf Methodenebene.
+Der Testserver soll automatisiert mit dem Unittest gestartet werden und einen zufälligen, freien Port belegen.
+Microsoft stellt mit dem Paket _Microsoft.AspNetCore.Mvc.Testing_ die Klasse _WebApplicationFactory_ bereit, die diese Aufgaben erledigt.
+Sie ist als _Basisklasse_ für eine eigene Implementierung gedacht und besitzt die zentrale Methode _ConfigureWebHost_.
+Als _virtual_ Methode kann sie überschrieben werden.
+
+Folgende Implementierung einer eigenen Testklasse _TestWebApplicationFactory_ zeigt den Einsatz.
+
+[source,csharp]
+----
+public class TestWebApplicationFactory<Tcontext>(string environment = "Testing") 
+    : WebApplicationFactory<Program> where Tcontext : DbContext    // <1>
+{
+    /* ... */
+    protected override void ConfigureWebHost(IWebHostBuilder builder)    // <2>
+    {
+        builder.ConfigureServices(services =>
+        {
+            foreach (var substituteService in _substituteServices)
+            {
+                var descriptor = services.First(d => 
+                    d.ServiceType == substituteService.Key);
+                services.Remove(descriptor);
+                substituteService.Value(services);
+            }
+        });
+        builder.UseEnvironment(environment);
+    }
+
+    public void SubstituteService<T>(    // <3>
+        Action<DbContextOptionsBuilder>? builderAction) where T : DbContext
+    { /* ... */ }
+    public void SubstituteService<T>(   // <4>
+        Func<IServiceProvider, T> factoryFuncion,
+        ServiceLifetime lifetime = ServiceLifetime.Scoped) where T : class
+    { /* ... */ }
+}
+----
+
+<1> Die Klasse ist generisch und hat den Typparameter _Tcontext_.
+     Später wird mit _new TestWebApplicationFactory<EventContext>()_ ein konkreter Datenbankkontext als Typ übergeben.
+     +
+     Über den primary constructor wird eine Variable _environment_ angelegt.
+     Dadurch kann der Server gezielt im Environment _Testing_ oder _Development_ gestartet werden.
+
+<2> In _ConfigureWebHost_ wird nun der Serviceprovider abgeändert.
+      Der Testserver startet zunächst mit den in der Datei _Program.cs_ definierten Services.
+      Danach suchen wir einzelne Services und tauschen sie aus bzw. entfernen diese.
+      So können wir erreichen, dass der Datenbankcontext z. B. auf die in-memory Datenbank verweist.
+
+<3> Damit die Registrierung des DbContext einfach ausgetauscht werden kann, bietet die Methode eine einfache Möglichkeit an, die Konfiguration des Testcontextes anzugeben.
+
+<4> Damit andere Services einfach ausgetauscht werden kann, bietet die Methode eine einfache Möglichkeit an, z. B. einen eigenen Time Provider zu registrieren.
+
+=== Requestmethoden in _TestWebApplicationFactory_
+
+In link:../Eventmanager/Eventmanager.Test/TestWebApplicationFactory.cs[→ TestWebApplicationFactory.cs] gibt es eine Implementierung, die auch bei Prüfungen zur Verfügung steht.
+Sie hat folgende Methoden, die wir danach in unseren Integration Tests nutzen:
+
+
+`void InitializeDatabase(Action<Tcontext> action)`::	
+Initialisiert die Datenbank mit einer vorgegebenen Methode.
+Da wir über den Serviceprovider auf die Datenbank zugreifen müssen, führt diese Methode folgende Schritte vor der Ausführung der übergebenen Funktion durch:
++
+Laden des Datenbankservices über den Service Provider. +
+Löschen und neu Erstellen der Datenbank.
++
+Konkret wird diese Methode z. B. so verwendet:
++
+[source,csharp]
+----
+_factory.InitializeDatabase(db =>
+{
+    var @event = new Event("Event1");
+    var show = new Show(
+        @event, new DateTime(2026, 3, 7, 14, 0, 0, DateTimeKind.Utc));
+    var contingent = new Contingent(show, ContingentType.Rang, 10);
+    db.AddRange(show, contingent);
+    db.SaveChanges();
+});    
+----
+
+`Tout QueryDatabase<Tout>(Func<Tcontext, Tout> query)`::
+Erlaubt das Abfragen der Datenbank durch den DbContext.
+Die Methode ruft das Service aus dem Service Provider ab und führt die übergebene Methode aus.
++
+Konkret wird diese Methode z. B. so verwendet:
++
+[source,csharp]
+----
+var contingentFromDb = _factory.QueryDatabase(
+    db => db.Contingents.First(c => c.Id == 2));
+----
+
+`Task<(HttpResponseMessage, T?)> GetHttpContent<T>(string requestUrl)`::
+`Task<(HttpResponseMessage, JsonElement)> GetHttpContent(string requestUrl)`::
+Sendet einen GET Request an die angegebene Adresse.
+Die Adresse muss keine Domain beinhalten, da der Port dynamisch zugewiesen wird.
+Wenn ein typisiertes Ergebnis geliefert wird, kann die DTO Klasse bzw. eine Liste der DTO Klasse als Typparameter angegeben werden.
+Wird kein Typparameter angegeben, wird ein JSON Element, also die "rohe" JSON Antwort, geliefert.
+Die Methode liefert ein Tupel aus 2 Elementen zurück.
++
+Konkret wird diese Methode z. B. so verwendet:
++
+[source,csharp]
+----
+var (response, content) = 
+    await _factory.GetHttpContent<ContingentDto>("/api/contingents/1");
+----
+
+In _response_ ist die _HttpResponseMessage_ gespeichert.
+Sie beinhaltet den Status Code und andere Header Informationen.
+In _content_ werden die eigentlichen Daten gespeichert.
+Da wir einen Typparameter (_ContingentDto_) angegeben haben, hat diese Variable den Typ _ContingentDto?_.
+
+`Task<(HttpResponseMessage, JsonElement)> PostHttpContent<Tcmd>(string requestUrl, Tcmd payload)`::
+`Task<(HttpResponseMessage, JsonElement)> PutHttpContent<Tcmd>(string requestUrl, Tcmd payload)`::
+`Task<(HttpResponseMessage, JsonElement)> PatchHttpContent<Tcmd>(string requestUrl, Tcmd payload)`::
+Sendet einen POST, PUT oder PATCH Request.
+Der Parameter _requestUrl_ ist wieder die Adresse.
+Der Parameter _paylad_ ist die Instanz eines command objects.
++
+Konkret wird diese Methode z. B. so verwendet:
++
+[source,csharp]
+----
+var (response, content) = await _factory.PostHttpContent(
+    "/api/contingents",
+    new CreateContingentCmd(1, "Floor", 10));
+----
+
+`Task<(HttpResponseMessage, JsonElement)> DeleteHttpContent(string requestUrl)`::
+Sendet einen DELETE Request.
+Der Parameter _requestUrl_ ist wieder die Adresse.
++
+Konkret wird diese Methode z. B. so verwendet:
++
+[source,csharp]
+----
+var (response, content) = await _factory.DeleteHttpContent("/api/contingents/1");
+----
+
+`bool ContentContainsErrorMessage(JsonElement content, string message)`::
+Prüft, ob eine problem detail Antwort eine definierte Fehlermeldung enthält.
+Die RFC problem detail kann 2 Formen haben.
++
+* _{ "detail": "Error message" }_ wenn mit _return Problem(...)_ gearbeitet wurde.
+* _{ "errors": "MyProperty": ["Validation message" ] }_ wenn Validierungsfehler auftreten.
++
+Es werden Teilstrings verglichen (nicht case sensitive), d. h. _not found_ ist für alle Fehlermeldungen zugreffend, die _not found_ in der Fehlermeldung in _detail_ oder in _errors_ haben.
+
+=== Konkrete Verwendung im Integration Test
+
+Die folgende Klasse zeigt den Test des link:../Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ ContingentsControllers]
+mit Hilfe der Hilfsklasse link:../Eventmanager/Eventmanager.Test/TestWebApplicationFactory.cs[→ TestWebApplicationFactory].
+
+.link:../Eventmanager/Eventmanager.Test/ContingentsControllerTests.cs[→ Eventmanager.Test/ContingentsControllerTests.cs]
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Dtos;
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Test;
+
+public class ContingentsControllerTests : IDisposable
+{
+    private readonly TestWebApplicationFactory<EventContext> _factory;
+    private readonly TimeProvider _timeProvider =
+        new FakeTimeProvider(
+            new DateTimeOffset(2026, 2, 28, 16, 30, 0, TimeSpan.Zero));
+    private readonly SqliteConnection _connection =
+        new SqliteConnection("DataSource=:memory:");
+    public ContingentsControllerTests()
+    {
+        _factory = new TestWebApplicationFactory<EventContext>();
+        _factory.SubstituteService<EventContext>(opt => opt.UseSqlite(_connection));
+        _factory.SubstituteService<TimeProvider>(opt => _timeProvider);
+    }
+    /// <summary>
+    /// Creates global test data for all unit tests.
+    /// </summary>
+    private void GenerateFixtures()
+    {
+        _factory.InitializeDatabase(db =>
+        {
+            var @event = new Event("Event1");
+            var show = new Show(
+                @event, new DateTime(2026, 3, 7, 14, 0, 0, DateTimeKind.Utc));
+            var contingent = new Contingent(show, ContingentType.Rang, 10);
+            db.AddRange(show, contingent);
+            db.SaveChanges();
+        });
+    }
+    /// <summary>
+    /// Checks whether GET /api/contingents/{id} returns HTTP 200 and a ContingentDto.
+    /// </summary>
+    [Fact]
+    public async Task GetContingentByIdReturns200WithDataTest()
+    {
+        GenerateFixtures();
+        var (response, contingent) = 
+            await _factory.GetHttpContent<ContingentDto>("/api/contingents/1");
+
+        Assert.Equal(200, (int)response.StatusCode);
+        Assert.NotNull(contingent);
+        Assert.True(contingent.Id != default);
+    }
+    /// <summary>
+    /// Checks whether POST /api/contingents returns HTTP 201 with ID and 
+    /// modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task CreateContingentReturns201Test()
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PostHttpContent(
+            "/api/contingents",
+            new CreateContingentCmd(1, "Floor", 10));
+
+        Assert.Equal(201, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(
+            db => db.Contingents.First(c => c.Id == 2));
+        Assert.True(contingentFromDb.Id != default);
+        Assert.True(content.GetProperty("id").GetInt32() != default);
+    }
+    /// <summary>
+    /// Checks whether PUT /api/contingents/{id} returns HTTP 204
+    /// and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task UpdateContingentReturns204Test()
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PutHttpContent(
+            "/api/contingents/1",
+            new UpdateContingentCmd(1, 1, "Floor", 10, 0));
+
+        Assert.Equal(204, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(
+            db => db.Contingents.First(c => c.Id == 1));
+        Assert.True(contingentFromDb.ContingentType == ContingentType.Floor);
+    }
+    /// <summary>
+    /// Checks whether DELETE /api/contingents/{id} returns HTTP 204
+    /// and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task DeleteContingentReturns204Test()
+    {
+        GenerateFixtures();
+        var (response, content) = 
+            await _factory.DeleteHttpContent("/api/contingents/1");
+
+        Assert.Equal(204, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(
+            db => db.Contingents.FirstOrDefault(c => c.Id == 1));
+        Assert.Null(contingentFromDb);
+    }
+    /// <summary>
+    /// Checks whether POST /api/contingents returns HTTP 400 with the
+    /// corresponding error message in the problem detail.
+    /// </summary>
+    [Theory]
+    [InlineData("xxx", 1, "invalid value for contingent type")]
+    [InlineData("Floor", 999, "show 999 not found")]
+    [InlineData("Rang", 1, "show has already a contingent for")]
+    public async Task CreateContingentReturns400WithProblemDetailTest(
+        string contingentType, int showId, string errorMessage)
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PostHttpContent(
+            "/api/contingents",
+            new CreateContingentCmd(showId, contingentType, 10));
+        Assert.Equal(400, (int)response.StatusCode);
+        Assert.True(_factory.ContentContainsErrorMessage(content, errorMessage));
+    }
+    public void Dispose()
+    {
+        _factory.Dispose();
+        _connection.Dispose();
+    }
+}
+----

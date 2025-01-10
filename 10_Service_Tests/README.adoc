@@ -1,0 +1,402 @@
+= Servicetests mit der SQLite in-memory DB
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::root_dir[:root_dir: .]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+== Analyse der Dependencies
+
+Unser _EventService_ hat unter anderem eine Dependency zum Datenbankcontext _EventContext_.
+Möchten wir das Service testen, müssen wir es natürlich im Unittest einmal instanzieren.
+Dafür müssen wir allerdings alle Argumente des Konstruktors übergeben.
+
+[source,csharp]
+----
+public class EventService(
+    EventContext db, TimeProvider timeProvider, bool isDevelopment) : IEventService
+{
+}
+----
+
+Wir erkennen 3 Dependencies: Den Datenbankcontext, den Timeprovider und einen bool Wert, der angibt, ob der Server im Development Mode läuft.
+Die schlechteste Möglichkeit wäre ein Durchführen des Testes mit der originalen Konfiguration des Datenbankcontextes.
+Dadurch würde die Produktionsdatenbank geändert werden.
+
+[WARNING]
+====
+Führe nie Unittests gegen die Produktionsdatenbank durch.
+Die Tests wären nicht deterministisch und hätten fatale Folgen für den Datenbestand.
+====
+
+=== Der Time Provider und der FakeTimeProvider
+
+In den Übungen wurde im _FitnessService_ über dependency injection die Klasse _TimeProvider_ aus dem .NET Framework angefordert.
+Das dazugehörige Service wurde in der Datei _Program.cs_ registriert:
+
+[source,csharp]
+----
+builder.Services.AddSingleton<TimeProvider>((provider) => TimeProvider.System);
+----
+
+Der Grund ist die Vermeidung von _DateTime.Now_ bzw. _DateTime.UtcNow_ im Service.
+Wenn wir z. B. bei einer Reservierung testen möchten, ob eine Show mindestens 14 Tage in der Zukunft liegt, würde dies nach klassischem Muster so aussehen:
+
+[source,csharp]
+----
+public async Task<int> CreateReservation(int guestId, int contingentId, int pax, DateTime dateTime)
+{
+    var contingent = await _db.Contingents
+        .Include(c => c.Show).Include(c => c.Tickets)
+        .FirstOrDefaultAsync(c => c.Id == contingentId)
+        ?? throw new EventServiceException("Invalid contingent id.");
+    if (contingent.Show.Date < DateTime.Now.AddDays(14))
+        throw new EventServiceException("The show is too close in time.");
+    /* ... */
+}
+----
+
+Probleme ergeben sich beim Testen: Ein Unittest, der die Methode _CreateReservation_ prüft und erfolgreich durchläuft, wird vielleicht in 1 Monat fehlschlagen.
+Lösungen wie das Verwenden von _DateTime.Now_ im Unittest sind problematisch, da der Test dadurch nicht _deterministisch_ aufgebaut ist.
+
+Daher gibt es seit .NET 8 die abstrakte Klasse link:https://learn.microsoft.com/en-us/dotnet/api/system.timeprovider[_TimeProvider_] im Namespace _System_.
+Diese Klasse kann unser Service im Konstruktor anfordern.
+Im Service selbst sieht die Methode _CreateReservation_ nun so aus:
+
+[source,csharp]
+----
+public async Task<int> CreateReservation(int guestId, int contingentId, int pax, DateTime dateTime)
+{
+    var contingent = await _db.Contingents
+        .Include(c => c.Show).Include(c => c.Tickets)
+        .FirstOrDefaultAsync(c => c.Id == contingentId)
+        ?? throw new EventServiceException("Invalid contingent id.");
+    if (contingent.Show.Date < timeProvider.GetLocalNow().DateTime.AddDays(14))    // <1>
+        throw new EventServiceException("The show is too close in time.");
+    /* ... */
+}
+----
+
+<1> Die Methode _GetLocalNow()_ liefert ein _DateTimeOffset_ mit der aktuellen Systemzeit.
+    Das Property _DateTime_ ruft den Datums- und Zeitwert ohne Zeitzone ab.
+
+Im Paket _Microsoft.Extensions.TimeProvider.Testing_, das über NuGet installiert werden muss, steht die Klasse _FakeTimeProvider_ bereit.
+Wenn wir nun das Service testen möchten, können wir mit folgendem Code die Zeit fix auf den 28.2.2026 um 16:30 UTC (0h Offet) festlegen:
+
+[source,csharp]
+----
+var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 2, 28, 16, 30, 0, TimeSpan.Zero));
+var service = new EventService(..., timeProvider);
+----
+
+== Aufbau der Testklasse
+
+Zuerst erstellen wir im Testprojekt eine neue Klasse mit dem Namen _EventServiceWithInMemoryDbTests_.
+Nun definieren wir einen Konstruktor und implementieren das Interface _IDisposable_.
+
+[source,csharp]
+----
+public class EventServiceWithInMemoryDbTests : IDisposable    // <1>
+{
+    private readonly SqliteConnection _conn;
+    private readonly EventContext _db;
+    private readonly FakeTimeProvider _timeProvider;
+    private readonly EventService _service;
+
+    public EventServiceWithInMemoryDbTests()
+    {
+        _conn = new SqliteConnection("DataSource=:memory:");    // <2>
+
+        _db = new EventContext(
+            new DbContextOptionsBuilder().UseSqlite(_conn).Options);    // <3>
+        _db.Database.EnsureDeleted();    // <4>
+        _db.Database.OpenConnection();
+        _db.Database.EnsureCreated();
+
+        _timeProvider = new FakeTimeProvider(
+            new DateTimeOffset(new DateTime(2026, 3, 9, 16, 0, 0)));       // <5>
+
+        _service = new EventService(
+            db: _db, timeProvider: _timeProvider, isDevelopment: true);    // <6>
+    }
+
+    public void Dispose()    // <7>
+    {
+        _db.Dispose();
+        _conn.Dispose();
+    }
+}
+----
+
+<1> Da wir die Datenbankverbindung selbst verwalten, müssen wir am Ende die Ressource selbst schließen.
+    Dafür stellt das .NET Framework das Interface _IDisposable_ zur Verfügung, das die Methode _Dispose()_ beinhaltet.
+<2> Wir erzeugen eine SQLite Connection mit dem Verbindungsstring _DataSource=:memory:_.
+    Dies erzeugt eine in-memory Datenbank.
+<3> Der _EventContext_ besitzt einen Konstruktor, der ein Argument vom Typ _DbContextOptions_ besitzt.
+    Über dieses Argument kann eine andere Zieldatenbank angegeben werden.
+<4> Nachdem die Datenbank zur Sicherheit gelöscht wurde, öffnen wir die Verbindung.
+    Mit _EnsureCreated()_ wird das Schema mittels _CREATE TABLE_ Anweisungen erzeugt.
+<5> Im Paket link:https://www.nuget.org/packages/Microsoft.Extensions.TimeProvider.Testing/[Microsoft.Extensions.TimeProvider.Testing]
+    befindet sich die Klasse _FakeTimeProvider_.
+    Sie erzeugt einen _TimeProvider_, der als aktuelle Zeit die angegebene Zeit zurückgibt.
+    Dadurch können wir alle Aufrufe des Services, die die Zeit abrufen, von außen steuern.
+<6> Nun wird das _EventService_ mit allen Dependencies instanziert.
+<7> Die _Dispose()_ Methode schließt alle Ressourcen.
+
+Da für jeden Unittest die Testklasse neu instanziert wird, können wir die beschriebenen Tätigkeiten im Konstruktor zentral erledigen.
+
+== Erstellen der Musterdaten
+
+Da das Service mit einer leeren Datenbank nur schlecht arbeiten kann, fügen wir Musterdaten hinzu.
+Achte darauf, dass die Daten _minimal_ sind.
+Sonst gibt es Seiteneffekte mit vorhandenen Daten, wenn z. B. ein neues Kontingent erstellt wird.
+
+[source,csharp]
+----
+private Tentity[] AddEntities<Tentity>(params Tentity[] items) where Tentity : class
+{
+    _db.Set<Tentity>().AddRange(items);
+    _db.SaveChanges();
+    return items;
+}
+
+private void GenerateFixtures()
+{
+    var events = AddEntities(new Event("Event1") { Id = 1 });
+    var shows = AddEntities(
+        new Show(events[0], new DateTime(2026, 3, 9, 14, 0, 0)) { Id = 1 },
+        new Show(events[0], new DateTime(2026, 3, 9, 16, 0, 0)) { Id = 2 });
+    var contingents = AddEntities(
+        new Contingent(shows[0], ContingentType.Rang, 10) { Id = 1 });
+}
+----
+
+`Tentity[] AddEntities<Tentity>(params Tentity[] items) where Tentity : class`::
+Diese Methode nutzt das sogenannte _params Array_ in C#.
+Ähnlich dem Rest Operator in JavaScript können alle angegebenen Argumente einer Methode als Array abgerufen werden.
+Dadurch können beliebig viele Argumente verarbeitet werden.
+Diese Daten werden in das entsprechende DbSet geschrieben, gespeichert und als Array zurückgegeben.
+_Tentity_ ist der Typparameter.
+Über _type inference_ erkennt C# durch den Aufruf, dass _Tentity_ bei _AddEntities(new Event(...))_  vom Typ _Event_ sein muss.
+Es funktioniert wie Bearbeiten -> Ersetzen in einem Editor.
+Da wir nur Klassen und nicht structs wie int, double, ... als Typparameter akzeptieren wollen, schränken wir mit _where Tentity : class_ ein.
+
+`void GenerateFixtures()`::
+Wenn wir in einem Unittest nun Testdaten haben möchten, können wir einfach diese Methode aufrufen.
+Somit vermeiden wir wiederholenden Code in den einzelnen Tests.
+
+== Schreiben des ersten Tests
+
+Sind wir einmal soweit gekommen, ist der eigentliche Test sehr einfach.
+Wir erzeugen nach den Musterdaten ein neues _CreateContingentCmd_ Objekt und übergeben es der Servicemethode.
+Im _Assert_ prüfen wir mit der _Any_ Funktion, ob der besagte Datensatz in der Datenbank gefunden wird.
+Da wir wissen, dass es keine anderen Datensätze mit dem Typ _Floor_ gibt, würde auch ein einfacheres Any ausreichen.
+Wir können dies nutzen, weil wir stets einen _definierten_ Zustand der Datenbank haben.
+
+[IMPORTANT]
+====
+Unittests müssen immer unabhängig voneinander ablaufen.
+Es darf nicht sein, dass Test A die Datenbank ändert und Test B arbeitet mit der geänderten Datenbank weiter.
+Es darf nur _eine_ Servicemethode getestet werden.
+====
+
+[source,csharp]
+----
+[Fact]
+public async Task CreateContingentCreatesNewContingentTest()
+{
+    GenerateFixtures();
+    await _service.CreateContingent(new CreateContingentCmd(1, "Floor", 10));
+    _db.ChangeTracker.Clear();
+    Assert.True(_db.Contingents.Any(c => 
+        c.ContingentType == ContingentType.Floor && c.AvailableTickets == 10));
+}
+----
+
+== Parametrisierte Tests
+
+In unserem Service gibt es mehrere Fehlerzustände.
+Um mit einer code coverage von 100% zu testen, müssen wir jeden fehlerhaften Fall erzeugen.
+
+Konkret haben wir 3 Fälle, wo aufgrund fehlerhafter Daten im command object eine _EventServiceException_ geworfen wird.
+
+[source,csharp]
+----
+if (!Enum.TryParse<ContingentType>(
+    cmd.ContingentType, ignoreCase: true, out var contingentType))
+    throw new EventServiceException(
+        $"{cmd.ContingentType} is not a valid contingent type.");
+
+var show = await db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
+    ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
+
+if (await db.Contingents.AnyAsync(c => 
+    c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
+    throw new EventServiceException(
+        $"Show has already a contingent for {cmd.ContingentType}.");
+----
+
+Wir können nun 3 Einzeltests schreiben, oder _parametrisierte Tests_ verwenden.
+Sie werden mit _Theory_ definiert.
+In _InlineData_ werden die Argumente angegeben, die dann vom Testframework übergeben werden.
+In diesem Beispiel werden 3 Unittests generiert und ausgeführt:
+
+image::{root_dir}/parameter_test_1730.png[]
+
+[NOTE]
+====
+Es können nicht alle Datentypen in _InlineData_ angegeben werden.
+Braucht man z. B. einen _DateTime_ Wert als Parameter, muss man diesen als String z. B. mit "2026-03-07T16:57:00" definieren, als String im Argument der Testmethode übergeben und mit _DateTime.Parse()_ im Test parsen.
+====
+
+Nun sieht unsere gesamte Testklasse so aus.
+Sie testet die Methoden _CreateContingent()_ und _UpdateContingent()_ mit 100% code coverage.
+
+.link:../Eventmanager/Eventmanager.Test/EventServiceWithInMemoryDbTests.cs[→ Eventmanager.Test/EventServiceWithInMemoryDbTests.cs]
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Services;
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Test;
+
+public class EventServiceWithInMemoryDbTests : IDisposable
+{
+    private readonly SqliteConnection _conn;
+    private readonly EventContext _db;
+    private readonly FakeTimeProvider _timeProvider;
+    private readonly EventService _service;
+
+    public EventServiceWithInMemoryDbTests()
+    {
+        _conn = new SqliteConnection("DataSource=:memory:");
+
+        _db = new EventContext(
+            new DbContextOptionsBuilder().UseSqlite(_conn).Options);
+        _db.Database.EnsureDeleted();
+        _db.Database.OpenConnection();
+        _db.Database.EnsureCreated();
+
+        _timeProvider = new FakeTimeProvider(
+            new DateTimeOffset(new DateTime(2026, 3, 9, 16, 0, 0)));
+
+        _service = new EventService(
+            db: _db, timeProvider: _timeProvider, isDevelopment: true);
+    }
+    /// <summary>
+    /// Hilfsmethode, die die übergebenen Parameter in die Datenbank
+    /// schreibt und diese als Array zurückgibt.
+    /// </summary>
+    private Tentity[] AddEntities<Tentity>(params Tentity[] items) 
+        where Tentity : class
+    {
+        _db.Set<Tentity>().AddRange(items);
+        _db.SaveChanges();
+        return items;
+    }
+    /// <summary>
+    /// Definiert zentrale Musterdaten, mit denen jeder Unittest arbeitet.
+    /// </summary>
+    private void GenerateFixtures()
+    {
+        var events = AddEntities(new Event("Event1") { Id = 1 });
+        var shows = AddEntities(
+            new Show(events[0], new DateTime(2026, 3, 9, 14, 0, 0)) { Id = 1 },
+            new Show(events[0], new DateTime(2026, 3, 9, 16, 0, 0)) { Id = 2 });
+        var contingents = AddEntities(
+            new Contingent(shows[0], ContingentType.Rang, 10) { Id = 1 });
+    }
+    /// <summary>
+    /// Testet den Erfolgsfall der Methode CreateContingent()
+    /// </summary>
+    [Fact]
+    public async Task CreateContingentCreatesNewContingentTest()
+    {
+        GenerateFixtures();
+        await _service.CreateContingent(new CreateContingentCmd(1, "Floor", 10));
+        _db.ChangeTracker.Clear();
+        Assert.True(_db.Contingents.Any(c => 
+            c.ContingentType == ContingentType.Floor && c.AvailableTickets == 10));
+    }
+    /// <summary>
+    /// Testet die geworfene Exception von CreateContingent
+    /// basierend auf den Daten des Command Objects.
+    /// </summary>
+    [Theory]
+    [InlineData(1, "x", "x is not a valid contingent type.")]
+    [InlineData(999, "Floor", "Show 999 not found.")]
+    [InlineData(1, "Rang", "Show has already a contingent for Rang")]
+    public async Task CreateContingentThrowsExceptionWithMessageTest(
+        int showId, string contingentType, string expectedMessage)
+    {
+        GenerateFixtures();
+        var ex = await Assert.ThrowsAsync<EventServiceException>(
+            () => _service.CreateContingent(
+                new CreateContingentCmd(showId, contingentType, 10)));
+        Assert.Contains(
+            expectedMessage, ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+    /// <summary>
+    /// Testet den Erfolgsfall der Methode UpdateContingent()
+    /// </summary>
+    [Fact]
+    public async Task UpdateContingentUpdatesContingentTest()
+    {
+        GenerateFixtures();
+        var expectedVersion = _timeProvider.GetTimestamp();
+        await _service.UpdateContingent(
+            new UpdateContingentCmd(1, 1, "Rang", 20, 0));
+        _db.ChangeTracker.Clear();
+        Assert.True(_db.Contingents.Any(c =>
+            c.Id == 1 && c.Show.Id == 1 && c.ContingentType == ContingentType.Rang
+            && c.AvailableTickets == 20 && c.Version == expectedVersion));
+    }
+    /// <summary>
+    /// Testet die geworfene Exception von UpdateContingent
+    /// basierend auf den Daten des Command Objects.
+    /// </summary>
+    [Theory]
+    [InlineData(999, 1, 0, "Rang", "EventServiceNotFoundException",
+                                   "Contingent 999 not found.")]
+    [InlineData(1, 1, 0, "x", "EventServiceException", 
+                              "x is not a valid contingent type.")]
+    [InlineData(1, 1, 999, "Rang", "EventServiceException", 
+                                   "The contingent has already changed.")]
+    [InlineData(1, 999, 0, "Rang", "EventServiceException", 
+                                   "Show 999 not found.")]
+    public async Task UpdateContingentThrowsExceptionWithMessageTest(
+        int contingentId, int showId, long version, string contingentType,
+        string errorType, string expectedMessage)
+    {
+        GenerateFixtures();
+        var ex = await Assert.ThrowsAnyAsync<EventServiceException>(
+            () => _service.UpdateContingent(new UpdateContingentCmd(
+                    contingentId, showId, contingentType, 20, version)));
+        Assert.Equal(errorType, ex.GetType().Name);
+        Assert.Contains(
+            expectedMessage, ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+    public void Dispose()
+    {
+        _db.Dispose();
+        _conn.Dispose();
+    }
+}
+----

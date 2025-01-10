@@ -1,0 +1,215 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0" version="29.6.0">
+  <diagram name="Seite-1" id="3UWUA1yETdIAkr1v0Jj1">
+    <mxGraphModel dx="3009" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Aptos;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;Client A&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="90" x="115" y="119" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Aptos;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;Client B&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="90" x="560" y="119" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-4" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Aptos;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;API&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="90" x="1205" y="119" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-6" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-8" style="endArrow=none;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="160" y="650" as="sourcePoint" />
+            <mxPoint x="160" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-7" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-18" style="endArrow=none;html=1;rounded=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="8_VzeCNe4ZYkvio0SVpa-3" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="605" y="650" as="sourcePoint" />
+            <mxPoint x="599.5" y="159" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-9" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;" target="8_VzeCNe4ZYkvio0SVpa-8" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="159" y="1040" as="sourcePoint" />
+            <mxPoint x="160" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-11" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1250" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-12" connectable="0" parent="8_VzeCNe4ZYkvio0SVpa-11" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" value="&lt;font face=&quot;Aptos&quot; style=&quot;font-size: 16px;&quot;&gt;GET /api/contingents/1&lt;/font&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.1522" y="2" as="geometry">
+            <mxPoint x="-536" y="-8" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-8" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="150" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-10" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-13" style="endArrow=none;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1250" y="649" as="sourcePoint" />
+            <mxPoint x="1250" y="159" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-16" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-21" style="endArrow=none;html=1;rounded=0;" target="8_VzeCNe4ZYkvio0SVpa-13" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1250" y="649" as="sourcePoint" />
+            <mxPoint x="1250" y="159" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-17" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;" target="8_VzeCNe4ZYkvio0SVpa-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-13" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1240" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-1" parent="1" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-weight: normal; font-size: 14px; line-height: 19px; white-space: pre; color: rgb(59, 59, 59);&quot;&gt;&lt;div style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;contingentType&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(163, 21, 21);&quot;&gt;&quot;Floor&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;80, &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;1687&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt; &lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); background-color: transparent;&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="435" x="-57.5" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-19" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1250" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-20" connectable="0" parent="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" value="&lt;font face=&quot;Aptos&quot; style=&quot;font-size: 16px;&quot;&gt;GET /api/contingents/1&lt;/font&gt;" vertex="1">
+          <mxGeometry x="702" y="349" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-22" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-50" style="endArrow=none;html=1;rounded=0;" target="8_VzeCNe4ZYkvio0SVpa-21" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1249" y="920" as="sourcePoint" />
+            <mxPoint x="1250" y="330" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-27" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;" target="8_VzeCNe4ZYkvio0SVpa-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-21" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1240" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-28" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="8_VzeCNe4ZYkvio0SVpa-18" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="605" y="1040" as="sourcePoint" />
+            <mxPoint x="605" y="159" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-18" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="595" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-33" parent="1" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space: pre;&quot;&gt;&lt;div style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); font-weight: normal;&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&lt;font&gt; &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;contingentType&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(163, 21, 21);&quot;&gt;&quot;Floor&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165); font-weight: normal;&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;b style=&quot;&quot;&gt;&lt;font style=&quot;color: rgb(255, 0, 0);&quot;&gt;&lt;span&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span&gt;: 10&lt;/span&gt;&lt;span&gt;0&lt;/span&gt;&lt;/font&gt;&lt;/b&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt; &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;&lt;font color=&quot;#098658&quot;&gt;1687 &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="447.5" x="1032.5" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-34" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="8_VzeCNe4ZYkvio0SVpa-33">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="830" y="850" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-35" connectable="0" parent="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" value="&lt;font face=&quot;Aptos&quot; style=&quot;font-size: 16px;&quot;&gt;PUT /api/contingents/1&lt;/font&gt;" vertex="1">
+          <mxGeometry x="698" y="717" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-36" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="595" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-37" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-39" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="8_VzeCNe4ZYkvio0SVpa-40">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="710" y="851" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-38" connectable="0" parent="1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;" value="&lt;font face=&quot;Aptos&quot; style=&quot;font-size: 16px;&quot;&gt;PUT /api/contingents/1&lt;/font&gt;" vertex="1">
+          <mxGeometry x="254" y="896" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-39" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="150" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-23" parent="1" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-weight: normal; font-size: 14px; line-height: 19px; white-space: pre; color: rgb(59, 59, 59);&quot;&gt;&lt;div style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&lt;font&gt; &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;contingentType&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(163, 21, 21);&quot;&gt;&quot;Floor&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;80&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;1687&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt; &lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); background-color: transparent;&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="483" x="365.5" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-42" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="84" width="445" x="-61" y="479" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-29" parent="8_VzeCNe4ZYkvio0SVpa-42" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space: pre;&quot;&gt;&lt;div style=&quot;font-weight: normal; color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&lt;font&gt; &lt;/font&gt;&lt;/span&gt;&lt;font style=&quot;background-color: transparent; color: rgb(255, 0, 0);&quot;&gt;&lt;b&gt;&quot;contingentType&quot;: &quot;Stands&quot;&lt;/b&gt;&lt;/font&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;font-weight: normal; color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;80&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;1687&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt; &lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); background-color: transparent;&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="445" y="24" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-31" parent="8_VzeCNe4ZYkvio0SVpa-42" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Aptos;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Change contingentType&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="190" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-43" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="85" width="485" x="363.5" y="595" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-30" parent="8_VzeCNe4ZYkvio0SVpa-43" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space: pre;&quot;&gt;&lt;div style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); font-weight: normal;&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&lt;font&gt; &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;contingentType&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(163, 21, 21);&quot;&gt;&quot;Floor&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165); font-weight: normal;&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;b style=&quot;&quot;&gt;&lt;font style=&quot;color: rgb(255, 0, 0);&quot;&gt;&lt;span&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span&gt;: 10&lt;/span&gt;&lt;span&gt;0&lt;/span&gt;&lt;/font&gt;&lt;/b&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt; &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;1687&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt; &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="485" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-32" parent="8_VzeCNe4ZYkvio0SVpa-43" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Aptos;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Change availableTickets&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="200" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-45" parent="1" style="ellipse;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="10" width="10" x="1222" y="845" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-46" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=default;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Aptos;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;Database&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="90" x="1637" y="119" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-48" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-57" style="endArrow=none;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1680" y="1110" as="sourcePoint" />
+            <mxPoint x="1681" y="159" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-59" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-47" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1250" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-47" parent="1" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-weight: normal; font-size: 14px; line-height: 19px; white-space: pre; color: rgb(59, 59, 59);&quot;&gt;&lt;div style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&lt;font&gt; &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;contingentType&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(163, 21, 21);&quot;&gt;&quot;Floor&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;80&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;1687&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt; &lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); background-color: transparent;&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="483" x="1440" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-49" parent="1" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space: pre;&quot;&gt;&lt;div style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); font-weight: normal;&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&lt;font&gt; &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;contingentType&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(163, 21, 21);&quot;&gt;&quot;Floor&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165); font-weight: normal;&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;0&lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;0&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt; &lt;/span&gt;&lt;u&gt;&lt;b&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;/b&gt;&lt;/u&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;&lt;font color=&quot;#098658&quot;&gt;&lt;u&gt;&lt;b&gt;1947&lt;/b&gt;&lt;/u&gt; &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="447.5" x="1456" y="780" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-51" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-55" style="endArrow=none;html=1;rounded=0;" target="8_VzeCNe4ZYkvio0SVpa-50" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1248" y="1140" as="sourcePoint" />
+            <mxPoint x="1250" y="440" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-52" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-50" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;" target="8_VzeCNe4ZYkvio0SVpa-49">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-50" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1240" y="800" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-54" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-55" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="8_VzeCNe4ZYkvio0SVpa-57">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1680" y="990" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-56" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;" target="8_VzeCNe4ZYkvio0SVpa-55" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1250" y="1040" as="sourcePoint" />
+            <mxPoint x="1250" y="820" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-55" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1240" y="980" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-58" edge="1" parent="1" style="endArrow=none;html=1;rounded=0;" target="8_VzeCNe4ZYkvio0SVpa-57" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1682" y="1040" as="sourcePoint" />
+            <mxPoint x="1681" y="159" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-57" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=#b85450;fillColor=#f8cecc;align=center;verticalAlign=middle;rounded=0;fontFamily=Aptos;fontSize=16;" value="1687 != 1947" vertex="1">
+          <mxGeometry height="30" width="110" x="1627" y="975" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-61" edge="1" parent="1" source="8_VzeCNe4ZYkvio0SVpa-60" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1250" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-60" parent="1" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-weight: normal; font-size: 14px; line-height: 19px; white-space: pre; color: rgb(59, 59, 59);&quot;&gt;&lt;div style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&lt;font&gt; &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;contingentType&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(163, 21, 21);&quot;&gt;&quot;Floor&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;80&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt;1687&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt; &lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); background-color: transparent;&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="483" x="1440" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="8_VzeCNe4ZYkvio0SVpa-40" parent="1" style="text;whiteSpace=wrap;html=1;labelBackgroundColor=none;spacing=5;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" value="&lt;div style=&quot;font-family: &amp;quot;Cascadia Code&amp;quot;, Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space: pre;&quot;&gt;&lt;div style=&quot;font-weight: normal; color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;{ &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;id&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;showId&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(163, 21, 21);&quot;&gt;&quot;1&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;, &lt;/span&gt;&lt;font style=&quot;background-color: transparent; color: rgb(255, 0, 0);&quot;&gt;&lt;b&gt;&quot;contingentType&quot;: &quot;Stands&quot;&lt;/b&gt;&lt;/font&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;font-weight: normal; color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186));&quot;&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&lt;font color=&quot;#3b3b3b&quot;&gt;  &lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;color: rgb(4, 81, 165);&quot;&gt;&quot;availableTickets&quot;&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;80&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(9, 134, 88);&quot;&gt; &lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(4, 81, 165);&quot;&gt;&quot;version&quot;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: rgb(59, 59, 59);&quot;&gt;: &lt;/span&gt;&lt;span style=&quot;color: rgb(9, 134, 88);&quot;&gt;1687&lt;/span&gt;&lt;span style=&quot;color: rgb(59, 59, 59); background-color: transparent;&quot;&gt; &lt;/span&gt;&lt;span style=&quot;color: light-dark(rgb(59, 59, 59), rgb(186, 186, 186)); background-color: transparent;&quot;&gt;}&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="447.5" x="1026.25" y="880" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,80 @@
+@startuml
+top to bottom direction
+hide empty methods
+
+enum Gender {
+    Male
+    Female
+}
+
+class Schoolclass {
+    + Id : int
+    + Shortname : string
+    + Department : string
+    + LanguageWeeks : List<LanguageWeek>
+    + Students : List<Student>
+}
+
+class Student {
+    + Id : int
+    + Firstname : string
+    + Lastname : string
+    + Email : string
+    + Schoolclass : Schoolclass
+    + Gender : Gender
+    + DateOfBirth : DateOnly
+    + Registrations : List<Registration>
+}
+
+Student --- Gender
+Student "1..n" -- "1" Schoolclass
+
+class Teacher {
+    + Id : int
+    + Shortname : string
+    + Firstname : string
+    + Lastname : string
+    + Email : string
+    + Gender : Gender
+    + LanguageWeekTeachers : List<LanguageWeek>
+    + LanguageWeekSupportTeachers : List<LanguageWeek>
+}
+
+Teacher -- Gender
+
+class LanguageWeek {
+    + Id : int
+    + Schoolclass : Schoolclass
+    + Destination : Destination
+    + From : DateOnly
+    + To : DateOnly
+    + Teacher : Teacher
+    + PricePerPerson : decimal
+    + SupportTeacher : Teacher?
+    + Registrations : List<Registration>
+}
+
+LanguageWeek "1..n" -- "1" Teacher : "> Teacher"
+LanguageWeek "1..n" -- "1" Teacher : "> SupportTeacher"
+LanguageWeek "1..n" -- "1" Schoolclass
+LanguageWeek "1..n" -- "1" Destination
+
+
+class Registration {
+    + Id : int
+    + LanguageWeek : LanguageWeek
+    + Student : Student
+    + RegisterDate : DateTime
+}
+
+Registration "1..n" -- "1" LanguageWeek
+Registration "1..n" -- "1" Student
+
+
+class Destination {
+    + Id : int
+    + City : string
+    + Country : string
+    + LanguageWeeks : List<LanguageWeek>
+}
+@enduml

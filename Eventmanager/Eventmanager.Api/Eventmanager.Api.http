@@ -1,0 +1,120 @@
+@baseUrl = http://localhost:5080
+
+GET {{baseUrl}}/api/events
+
+###
+
+GET {{baseUrl}}/api/events/2
+
+###
+
+# Request should fail (404 not found)
+GET {{baseUrl}}/api/events/999
+
+###
+
+GET {{baseUrl}}/api/events/2?includeShows=true
+
+###
+
+# Request should work (show 1 has no contingent for floor)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "Floor",
+    "availableTickets": 100
+}
+
+###
+
+# Request should not work (wrong enum value)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "XXX",
+    "availableTickets": 100
+}
+
+###
+
+# Request should not work (show 1 already has a contingent for stands)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "Stands",
+    "availableTickets": 100
+}
+
+###
+
+# Request should not work: Contingent 999 not found.
+PUT {{baseUrl}}/api/contingents/999
+Content-Type: application/json
+{
+    "id": 999,
+    "showId": "1",
+    "contingentType": "Floor",
+    "availableTickets": 80,
+    "version": 0
+}
+
+###
+
+# Request should work one time: 204 no content.
+# After the first request: The contingent has already changed.
+PUT {{baseUrl}}/api/contingents/1
+Content-Type: application/json
+{
+    "id": 1,
+    "showId": "1",
+    "contingentType": "Floor",
+    "availableTickets": 80,
+    "version": 0
+}
+
+###
+
+# Request should not work: The number of tickets sold or reserved exceeds ...
+PATCH {{baseUrl}}/api/contingents/25/availableTickets
+Content-Type: application/json
+{
+    "id": 25,
+    "availableTickets": 35
+}
+
+###
+
+# Request should work
+PATCH {{baseUrl}}/api/contingents/25/availableTickets
+Content-Type: application/json
+{
+    "id": 25,
+    "availableTickets": 80
+}
+
+###
+
+# Request should not work: The contingent has already sold ...
+DELETE {{baseUrl}}/api/contingents/25
+
+####
+
+# Request should work
+DELETE {{baseUrl}}/api/contingents/44
+
+####
+
+GET {{baseUrl}}/api/guests
+
+###
+
+GET {{baseUrl}}/api/guests/AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw0KRdVRr
+
+###
+
+GET {{baseUrl}}/api/guests/AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw1KRdVRr
+
+###
