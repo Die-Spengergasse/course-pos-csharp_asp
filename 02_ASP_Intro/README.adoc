@@ -1,0 +1,258 @@
+= ASP.NET Core
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+== Serverseitige Umsetzung von RESTful APIs
+
+Die Entwicklung von RESTful APIs hat sich über die Jahrzehnte von monolithischen Java-Schwergewichten hin zu flexiblen, Cloud-nativen Microservices stark gewandelt.
+Je nach Ökosystem (JavaScript, Java oder .NET) bieten die verschiedenen Frameworks unterschiedliche Ansätze in Bezug auf Konfiguration, Performance und Struktur.
+
+=== JavaScript/TypeScript: Express und Node.js
+
+Express gilt als der „Großvater“ der Node.js-Frameworks.
+Es wurde 2010 veröffentlicht und verfolgt einen minimalistischen, unvoreingenommenen (unopinionated) Ansatz.
+Entwickler haben hier die volle Freiheit, wie sie Middleware, Routing und Datenbanken integrieren.
+Eine API wird in Express manuell durch das Definieren von Routen (z. B. _app.get('/api/users', ...)_) aufgebaut.
+Es ist ideal für reine Backend-Dienste und Microservices, erfordert aber viel Eigenregie bei der Projektstruktur.
+
+=== Java: Spring Boot
+
+Spring Boot revolutionierte die Java-Welt bei seinem Erscheinen im Jahr 2014.
+Zuvor war die Entwicklung von Java-Webanwendungen (Java EE) berüchtigt für extrem komplexe XML-Konfigurationen und langsame Deployments.
+Spring Boot führte das Prinzip „Convention over Configuration“ ein: Es bietet fertige Starter-Pakete, die einen eingebetteten Server (wie Tomcat) mitbringen.
+REST-APIs werden hier sehr deklarativ mittels Annotationen wie @RestController und @GetMapping umgesetzt.
+Es ist heute der Industriestandard für robuste, hochskalierbare Enterprise-Anwendungen.
+
+=== C#: ASP.NET Core
+
+Die Geschichte von ASP.NET Core begann 2016 als kompletter Rewrite des alten, Windows-gebundenen .NET Frameworks.
+Microsoft öffnete sich damit für Open Source und Cross-Platform-Entwicklung (Linux/macOS).
+Für RESTful APIs nutzt man in ASP.NET Core meist den Web API-Controller-Ansatz oder die seit .NET 6 populären Minimal APIs, die den Code-Overhead massiv reduzieren.
+Es zeichnet sich durch eine extrem hohe Performance aus und bietet durch die starke Typisierung von C# eine hohe Typsicherheit, die besonders in großen Teams geschätzt wird.
+
+== Anlegen unseres ersten ASP.NET Core Projektes
+
+Im Kapitel _Services_ haben wir für ein Verwaltungssystems für Events Abfragen und Servicemethoden geschrieben.
+Nun wollen wir Endpunkte bereitstellen.
+Dafür legen wir in der Konsole ein leeres .NET 10 Projekt an.
+
+[source]
+----
+mkdir EventManager
+cd EventManager
+mkdir EventManager.Application
+cd EventManager.Application
+dotnet new classlib
+dotnet add package Bogus --version 35.6.5
+dotnet add package Microsoft.EntityFrameworkCore.Sqlite --version 10.*
+dotnet add package Microsoft.EntityFrameworkCore.Sqlserver --version 10.*
+cd ..
+mkdir EventManager.Api
+cd EventManager.Api
+dotnet new webapi
+dotnet add reference ..\EventManager.Application
+dotnet add package Swashbuckle.AspNetCore.SwaggerUI --version 10.*
+cd ..
+dotnet new sln -f sln
+dotnet sln add EventManager.Api
+dotnet sln add EventManager.Application
+start EventManager.sln
+----
+
+Die Modelklassen, den DbContext in Infrastructure und die Serviceklassen können wir 1:1 aus dem Beispiel übernehmen.
+Sie stehen im Archiv link:./Eventmanager.Application.7z[Eventmanager.Application.7z] zum Download bereit.
+
+image::../events_0716.svg[]
+
+Der Ordner _Eventmanager.Api_ hat folgende Dateien, die wir nun besprechen:
+
+----
+📁 Properties
+    🗎 launchSettings.json
+🗎 appsettings.json
+🗎 Eventmanager.Api.csproj
+🗎 Program.cs
+----
+
+== Konfiguration unserer API
+
+=== Die Datei appsettings.json
+
+Das O in den _SOLID_ Principles steht für "open for extension, closed for modification".
+ASP.NET Core setzt dieses Prinzip unter anderen durch eine _zentrale Konfiguration_ um.
+Wir können in der Datei _appsettings.json_ verschiedene Dinge Konfigurieren:
+
+* Connectionstrings zu Datenbanken
+* Loggereinstellungen
+* Einstellungen für externe Services (OAuth, etc.)
+* u.v.m.
+
+Zu Beginn setzen wir den Namen der SQLite Datenbank unter _ConnectionStrings_.
+Im Logger stellen wir ein, dass EF Core nicht jede SELECT Anweisung protokolliert, sondern nur Warnungen und Fehler.
+
+[source,json]
+----
+{
+  "ConnectionStrings": {
+    "Default": "DataSource=events.db"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+----
+
+=== Die Datei lauchSettings.json (Ordner Properties)
+
+Wie bei jedem Webserver können wir den Port und das Verhalten des Servers einstellen.
+Zuerst legen wir mit der _applicationUrl_ fest, dass unser Server nur auf _localhost_, Port 5080 hört.
+_http_ bedeutet, dass Klartext HTTP verwendet wird.
+Die Umgebungsvariable _ASPNETCORE_ENVIRONMENT_ legen wir auf _Development_ fest.
+Sie kann später in der _Program.cs_ ausgelesen werden und ermöglicht es, bestimmte Dinge nur im _Development Mode_ anzubieten.
+
+[source,json]
+----
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "swagger",
+      "applicationUrl": "http://localhost:5080",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+----
+
+=== Die Datei Program.cs
+
+Wir ersetzen nun die generierte Datei _Program.cs_ durch diesen Inhalt.
+
+[source,csharp]
+----
+using Eventmanager.Infrastructure;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+public class Program
+{
+    private static void Main(string[] args)
+    {
+        // STEP 1: Configuring ASP.NET Core Services
+        var builder = WebApplication.CreateBuilder(args);
+        builder.Services.AddOpenApi();
+        builder.Services.AddControllers();
+
+        // Configure Datebase with settings from appsettings.json (section ConnectionStrings)
+        builder.Services.AddDbContext<EventContext>(options => 
+            options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+
+        // STEP 2: Configuring ASP.NET Core request pipeline
+        var app = builder.Build();
+        if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+        {
+            // Map http://localhost:5080/openapi/v1.json
+            app.MapOpenApi();
+            app.UseSwaggerUI(options =>
+            {
+                options.SwaggerEndpoint("/openapi/v1.json", "API v1");
+            });
+            using (var scope = app.Services.CreateScope())
+            using (var service = scope.ServiceProvider.GetRequiredService<EventContext>())
+            {
+                service.Database.EnsureDeleted();
+                service.Database.EnsureCreated();
+                if (app.Environment.IsDevelopment()) service.Seed();
+            }
+        }
+        // Assign controllers to routes.
+        app.MapControllers();
+        app.Run();
+    }
+}
+----
+
+Die Konfiguration folgt dem klassischen **Builder-Pattern**, das in zwei Hauptphasen unterteilt ist:
+
+1. **Service-Registrierung**: Definition der Abhängigkeiten (Dependency Injection).
+2. **Middleware-Pipeline**: Konfiguration der Request-Verarbeitung.
+
+
+== Schritt 1: Service-Konfiguration (Builder-Phase)
+
+In diesem Abschnitt werden die benötigten Komponenten im `IServiceCollection`-Container registriert.
+
+[source,csharp]
+----
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddOpenApi();     // <1>
+builder.Services.AddControllers(); // <2>
+----
+<1> **AddOpenApi**: Registriert die integrierte Unterstützung für die Generierung von OpenAPI-Dokumenten (Standard in neueren .NET Versionen).
+<2> **AddControllers**: Ermöglicht die Nutzung von Controller-Klassen (`[ApiController]`) für das Routing und die Logik.
+
+=== Datenbank-Setup
+
+[source,csharp]
+----
+builder.Services.AddDbContext<EventContext>(options => 
+    options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+----
+
+Hier wird der `EventContext` (Entity Framework Core) registriert.
+Er nutzt **SQLite** und bezieht den Verbindungsstring aus der `appsettings.json` (Sektion `ConnectionStrings:Default`).
+
+== Schritt 2: Request-Pipeline & Laufzeitverhalten
+
+Nach `builder.Build()` wird das Verhalten der Anwendung bei eingehenden HTTP-Requests definiert.
+
+=== Entwicklung vs. Testumgebung
+
+Das Code-Snippet enthält eine spezifische Logik für Nicht-Produktionsumgebungen:
+
+[source,csharp]
+----
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+{
+    app.MapOpenApi(); // Stellt das JSON-Dokument bereit
+    app.UseSwaggerUI(options => { ... }); // Visualisiert die API-Doku
+}
+----
+
+=== Datenbank-Initialisierung (Seeding)
+
+Innerhalb der Development/Testing-Bedingung wird ein **Scope** erstellt, um auf registrierte Services zuzugreifen:
+
+* **EnsureDeleted/Created**: Löscht die Datenbank und erstellt sie neu (nützlich für einen sauberen State beim Testen).
+* **Seed()**: Füllt die Datenbank mit Testdaten, sofern man sich im `Development`-Modus befindet.
+
+== Schritt 3: Endpunkte und Start
+
+[source,csharp]
+----
+app.MapControllers(); // Aktiviert das Routing zu den Controllern
+app.Run(); // Startet den Webserver (Kestrel)
+----

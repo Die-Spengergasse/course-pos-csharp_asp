@@ -1,0 +1,484 @@
+= POST Routen, Services und Validierung
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+image::../events_0716.svg[]
+
+NOTE: Link zum Programm: link:../Eventmanager[Eventmanager]
+
+== Das Event Service
+
+Wir möchten nun mit Hilfe unserer API Kontingente für unsere Events anlegen können.
+Dabei gibt es verschiedene Regeln, die sogenannte _Business Logik_, zu beachten.
+Diese Logik sollte aus folgenden Gründen nicht direkt im Controller implementiert werden:
+
+* *DRY (don't repeat yourself)*: Prüfungen, etc. müssen in jeder Controllermethode implementiert werden.
+* *Clean Architecture*: Der Servicelayer soll ein eigenständiger Layer sein.
+  Siehe link:https://devblogs.microsoft.com/ise/next-level-clean-architecture-boilerplate/#clean-architecture-in-a-nutshell[Clean Architecture in a Nutshell] und link:https://levelup.gitconnected.com/clean-architecture-86c4f03e4771[Understanding Clean Architecture].
+* *Schlechte Testbarkeit*: Der Servicelayer kann nicht separat getestet werden und er kann nicht durch Mockingframeworks abgetrennt werden.
+
+Als konkretes Beispiel wollen wir nun ein EventService anlegen.
+Bei größeren Projekten empfiehlt sich das Anlegen mehrerer Serviceklassen, die thematisch zusammenhängen.
+Das kann z. B. ein _TicketService_, ein _CustomerService_, ein _InvoiceService_, etc. sein.
+Wir legen das Service im _Application Projekt_ an, da es keine Abhängigkeiten zu ASP.NET hat und auch keine haben soll.
+
+.Eventmanager.Application/Services/EventService.cs
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Services;
+
+
+public class EventService
+{
+    private readonly EventContext _db;
+    private readonly bool _isDevelopment;
+
+    public EventService(EventContext db, bool isDevelopment)    // <1>
+    {
+        _db = db;
+        _isDevelopment = isDevelopment;
+    }
+
+    public IQueryable<Contingent> Contingents => _db.Contingents.AsQueryable();  // <2>
+
+    public async Task<Contingent> CreateContingent(CreateContingentCmd cmd)      // <3>
+    {
+        var show = await _db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId);
+        if (show is null)
+            throw new EventServiceException($"Show {cmd.ShowId} not found.");
+
+        if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
+            throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
+
+        if (_db.Contingents.Any(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
+            throw new EventServiceException($"Show has already a contingent for {cmd.ContingentType}.");
+
+        var contingent = new Contingent(show, contingentType, cmd.AvailableTickets);
+        _db.Add(contingent);
+        await SaveChanges();
+        return contingent;
+    }
+
+    private async Task SaveChanges()    // <4>
+    {
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException e)
+        {
+            var message = _isDevelopment 
+                ? e.InnerException?.Message ?? e.Message 
+                : "Cannot write changes to database.";
+            throw new EventServiceException(e.InnerException?.Message ?? e.Message);
+        }
+    }
+}
+----
+
+<1> Über _dependency injection_ soll später ASP.NET Core eine Instanz des _EventContext_ bereitstellen.
+    Wir erzeugen niemals im Service mit _new_ eine Instanz der Datenbankverbindung!
+    Die Variable _isDevelopment_ wird später bei der Registrierung des Services gesetzt.
+    Sie ermöglicht im Inneren des Services das Ausführen von speziellem Code, der nur im Development Mode verfügbar sein soll.
+
+<2> In unserem Controller wollen wir direkten Zugriff auf den Datenbankkontext vermeiden.
+    Da wir im Controller auch von der Datenbank lesen wollen, können wir mit folgender Idee einen lesenden Zugriff auf die Datenbank bereitstellen:
+    Der Typ _IQueryable_ stellt Funktionen zur Auswertung von Abfragen bereit.
+    Er wird im _DbSet_ implementiert, das bedeutet wir können aus dem _Set<Contingent>_ mit _AsQueryable()_ einen "read only" Zugriff auf das DbSet _Contingents_ ermöglichen.
+    Wenn andere DbSets benötigt werden, können diese ebenfalls als Property vom Typ _IQueryable_ angeboten werden.
+
+<3> Die Methode _CreateContingent_ implementiert die Businesslogik zur Erstellung eines Kontingentes.
+    Als Parameter bekommt sie ein sogenanntes _command object_.
+    Später dazu mehr.
+
+<4> Um Codeduplizierungen zu vermeiden, geben wir die Fehlerbehandlung für _SaveChangesAsync()_ in eine eigene Methode.
+    Eine _DbUpdateException_ entsteht, wenn Aktualisierungen durch _INSERT_, _UPDATE_ oder _DELETE_ nicht von der Datenbank verarbeitet werden können.
+    Dies kann durch Constraints, Regeln der referentiellen Integrität, etc. passieren.
+    Wir reagieren darauf, indem wir die Fehlermeldung der Datenbank als Servicefehler weitergeben.
+    *Hinweis:* Es werden sehr konkrete Fehlermeldungen an den Client zurückgegeben, die auf den internen Aufbau der Datenbank schließen lassen.
+    Daher verwenden wir sie nur im Development Mode.
+
+
+=== Das Interface IEventService
+
+Das D in SOLID steht für _dependency inversion principle_.
+Unser Controller sollte nicht eine konkrete Implementierung des Services anfordern, sondern nur die Funktionalität, also das Interface.
+
+Über Refactoring in der IDE können wir leicht ein Interface aus unserer Serviceklasse erstellen.
+Es beinhaltet alle _public_ Methoden und Properties.
+Später können wir durch Mocking Frameworks eine eigene Implementierung zum Testen der Controller erzeugen.
+
+.Eventmanager.Application/Services/IEventService.cs
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Model;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Services;
+
+public interface IEventService
+{
+    IQueryable<Contingent> Contingents { get; }
+
+    Task<Contingent> CreateContingent(CreateContingentCmd cmd);
+}
+----
+
+=== Das Command Object
+
+Im _Application Projekt_ erstellen wir einen Ordner mit dem Namen _Commands_.
+Der Namespace _System.ComponentModel.DataAnnotations_ stellt uns verschiedene Attribute bereit, um Constraints zu definieren.
+Dies ist vergleichbar mit den Constraints der _CREATE TABLE_ Anweisung.
+ASP.NET Core kann diese Attributes später auslesen und entsprechend darauf reagieren.
+Die Validierung selbst hat mit ASP.NET Core noch nichts zu tun.
+
+Es gibt verschiedene vorgegebene Attribute.
+
+[cols="1,4",format=tsv]
+|===
+AllowedValues	Specifies a list of values that should be allowed in a property.
+StringLength	Specifies the minimum and maximum length of characters that are allowed in a data field.
+Range	Specifies the numeric range constraints for the value of a data field.
+RegularExpression	Specifies that a data field value must match the specified regular expression.
+EmailAddress	Validates an email address.
+Url	Provides URL validation.
+|===
+
+Dies ist nur ein kleiner Ausschnitt.
+Auf https://learn.microsoft.com/en-us/dotnet/api/system.componentmodel.dataannotations?view=net-10.0 werden alle Attribute aufgelistet.
+
+==== Das Required Attribute
+
+In der Doku gibt es auch ein Attribut für _Required_.
+Da wir aber das _nullable_ Feature in C# verwenden, wird folgende Regel angewandt:
+
+____
+The validation system treats non-nullable parameters or bound properties as if they had a [Required(AllowEmptyStrings = true)] attribute.
+By enabling Nullable contexts, MVC implicitly starts validating non-nullable properties or parameters as if they had been attributed with the [Required(AllowEmptyStrings = true)] attribute. 
+
+Quelle: https://learn.microsoft.com/en-us/aspnet/core/mvc/models/validation?view=aspnetcore-10.0#non-nullable-reference-types-and-required-attribute
+____
+
+[CAUTION]
+====
+Leerstrings werden durch dieses Verhalten zugelassen!
+Wenn du dies nicht möchtest, definiere mit _StringLength_ eine minimale Länge von 1.
+Wertetypen (structs) wie _int_, _bool_, _DateTime_, etc. werden auf den Standardwert gesetzt, wenn kein Wert übertragen wurde.
+Beachte, dass _DateTime_ auch ein Wertetyp ist und den 1.1.0001 als Wert annimmt, wenn kein Wert übertragen wurde.
+====
+
+Nun wollen wir für den Parameter der Methode _CreateContingent_ ein command object mit dem Namen _CreateContingentCmd_ erstellen:
+
+.Eventmanager.Application/Commands/CreateContingentCmd.cs
+[source,csharp]
+----
+using Eventmanager.Model;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
+namespace Eventmanager.Application.Commands;
+
+public record CreateContingentCmd(
+    int ShowId,
+    [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid contingent type.")]    // <1>
+    string ContingentType,
+    [Range(1,9999)]    // <2>
+    int AvailableTickets) : IValidatableObject    // <3>
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!Enum.IsDefined(typeof(ContingentType), ContingentType))
+        {
+            yield return new ValidationResult(             // <4>
+                "Invalid value for contingent type",
+                new string[] { nameof(ContingentType) });
+        }
+    }
+}
+----
+
+
+<1> Im Attribute _StringLength_ definieren wir minimale und maximale Länge.
+    Die minimale Länge ist wichtig, da wir keine leeren Strings ("") akzeptieren wollen.
+    Die maximale Länge ist wichtig, damit ein Client nicht einen String mit 1 Million Zeichen übermitteln kann.
+    Über _ErrorMessage_ können wir die Fehlermeldung, die an den Client gesendet wird, steuern.
+
+<2> Da _int_ ein Wertetyp ist, würde, wenn _AvailableTickets_ nicht übertragen wird, dieser Wert auf 0 gesetzt werden.
+    Daher legen wir das Minimum auf 1 fest.
+
+<3> Für komplexere Validierungen können wir das Interface _IValidatableObject_ implementieren.
+    Es definiert die Methode _Validate_, die nach der Validierung der Attributes aufgerufen wird.
+    Sie liefert einen Enumerator (also eine Liste) von Fehlermeldungen zurück.
+    Mit _yield return_ können wir in C# ein Element im Enumerator zurückliefern.
+    Dadurch können wir auch mehrere Validierungen in diese FUnktion schreiben.
+
+<4> Das _ValidationResult_ besteht aus der Fehlermeldung und einer Liste von Properties, die diesen Fehler verursacht haben.
+    Diese Information wird an den Client gesandt und hilft ihm, z. B. die betreffenden Formularelemente hervorzuheben.
+
+=== Registrieren des Services in ASP.NET Core
+
+Bis jetzt haben wir im _Application Projekt_ gearbeitet, da die implementierte Logik noch nichts mit APIs zu tun hat.
+Nun wollen wir in ASP.NET Core auf unser Service zugreifen.
+Zuerst müssen wir das Service registrieren, damit wir über dependency injection aus dem Controller heraus zugreifen können.
+
+Es gibt verschiedene Arten von Services
+
+[cols="1,4",format=tsv]
+|===
+Transient Service	Es wird bei jeder Verwendung des Services durch DI eine neue Instanz erzeugt.
+Scoped Service	Es wird bei jedem Request eine neue Instanz erzeugt.
+Singleton Service	Es wird zu Programmstart eine Instanz erzeugt, diese wird während der gesamten Laufzeit verwendet.
+                    Diese Services müssen thread safe sein und erfordern viel Erfahrung.
+|===
+
+Wir werden immer ein _Scoped Service_ anlegen, da unsere Services schnell instanziert werden können und wir keine Seiteneffekte berücksichtigen müssen.
+Für die Registrierung gibt es die Methode _AddScoped_ des Service Providers, die wir in der Datei _Program.cs_ verwenden.
+
+.Eventmanager.Api/Program.cs
+[source,csharp]
+----
+public class Program
+{
+    private static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
+        // ...
+        // Configure Datebase with settings from appsettings.json (section ConnectionStrings)
+        builder.Services.AddDbContext<EventContext>(options =>
+            options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+
+        builder.Services.AddScoped<IEventService, EventService>((provider) => new EventService(
+            db: provider.GetRequiredService<EventContext>(),
+            isDevelopment: builder.Environment.IsDevelopment()));
+        // ...
+    }
+}
+----
+
+_AddScoped()_ hat mehrere Überladungen. Die hier verwendete hat 2 Typparameter: Das Interface, das wir im Controller anfordern (_IEventService_) und das Service selbst.
+Wenn wir mit `builder.Services.AddScoped<IEventService, EventService>();` die Registrierung durchführen möchten, entsteht folgende Exception:
+
+----
+System.AggregateException: 'Some services are not able to be constructed
+(Error while validating the service descriptor 'ServiceType: Eventmanager.Services.IEventService Lifetime:
+Scoped ImplementationType: Eventmanager.Services.EventService':
+Unable to resolve service for type 'System.Boolean' while attempting to activate 'Eventmanager.Services.EventService'.)'
+----
+
+ASP.NET Core kann alle Parameter des Services auflösen, die registriert wurden.
+Würde unser Service nur den _EventContext_ verwenden, wäre dies möglich.
+User Service hat aber auch den Parameter _isDevelopment_ vom Typ _bool_.
+Die Fehlermeldung sagt aus, dass ASP nicht weiß, wie der Wert für _isDevelopment_ abzurufen ist.
+Daher müssen wir ASP helfen und selbst den Konstruktor des Services angeben.
+
+Mit `provider.GetRequiredService<EventContext>()` rufen wir eine Instanz des _EventContext_ ab und übergeben ihn als ersten Parameter.
+Mit _builder.Environment.IsDevelopment()_ befüllen wir den Parameter _isDevelopment_.
+
+=== Die Klasse ContingentsController
+
+Der Controller unterscheidet sich vom Aufbau her nicht vom _EventsController_ des letzten Kapitels.
+Wir haben weiterhin _Route_, _ApiController_ und _Http_ Attributes für das Routing.
+Über Dependency Injection wird nun eine Implementierung von _IEventService_ abgerufen.
+ASP wird - wie vorher definiert - das _EventService_ mit den richtigen Parametern instanzieren und übergeben.
+
+[IMPORTANT]
+====
+Wir haben keine Dependency zur Datenbank durch den _EventContext_, da dadurch Prüflogik im Service umgangen werden könnte und das clean code Schema durchbrochen wird.
+====
+
+.Eventmanager.Api/Controllers/ContingentsController.cs
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Dtos;
+using Eventmanager.Services;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Api.Controllers;
+
+[Route("api/[controller]")]
+[ApiController]
+public class ContingentsController : ControllerBase
+{
+    private readonly IEventService _eventService;
+
+    public ContingentsController(IEventService eventService)
+    {
+        _eventService = eventService;
+    }
+
+    [HttpGet("{id}")]
+    [ProducesResponseType<ContingentDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ContingentDto>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ContingentDto>> GetContingentById(int id)
+    {
+        var contingent = await _eventService.Contingents
+            .Where(c => c.Id == id)
+            .Select(c => new ContingentDto(
+                c.Id, c.Show.Id, c.Show.Date,
+                c.Show.Event.Name, c.ContingentType.ToString(), c.AvailableTickets))
+            .FirstOrDefaultAsync();
+        if (contingent is null) return Problem("Contingent not found.", statusCode: 404);
+        return Ok(contingent);
+    }
+
+    [HttpPost]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateContingent([FromBody] CreateContingentCmd cmd)
+    {
+        try
+        {
+            var contingent = await _eventService.CreateContingent(cmd);
+            // Return 201 created and set the location header to the uri of the created resource (/api/contingents/{id})
+            return CreatedAtAction(
+                nameof(GetContingentById),      // Name of GET Method to retrieve the resource.
+                new { id = contingent.Id },     // Routing parameter (id)
+                new { id = contingent.Id });    // Created resource.
+        }
+        catch (EventServiceException e)
+        {
+            return Problem(e.Message, statusCode: 400);
+        }
+    }
+}
+----
+
+Die Neuerung ist die Implementierung der _POST Route_ mit dem Attribute _HttpPost_.
+Der Controller wird daher auf POST Requests, die an die Controlleradresse gehen (_POST /api/contingents_) reagieren.
+Als Parameter der Methode _CreateContingent_ wird das command object _CreateContingentCmd_ übergeben.
+ASP.NET Core erzeugt es automatisch aus den Daten des _request bodies_.
+Dieser Mechanismus heißt _model binding_.
+Eine genaue Dokumentation ist auf https://learn.microsoft.com/en-us/aspnet/core/mvc/models/model-binding?view=aspnetcore-10.0 abrufbar.
+
+Im Gegensatz zur GET Route liefert der Controller im Erfolgsfall den Code _201 created_.
+Zusätzlich werden noch 2 Informationen übermittelt:
+
+* Ein *location header* mit der URL der neu erstellten Ressource (z. B. http://localhost:5080/api/Contingents/74)
+* Eine Antwort mit der ID der neuen Ressource als JSON.
+  Da die ID in der Datenbank generiert wurde, schicken wir dem Client diese Information zurück.
+
+Die Methode _CreatedAtAction()_ erzeugt für uns diese Information.
+Dafür müssen wir als ersten Parameter den Namen der Methode angeben, die die Details der neu angelegten Ressource abrufen kann (also _GetContingentById_).
+Der zweite Parameter gibt den Parameter für _GetContingentById_ an.
+Diese Methode erwartet sich einen Parameter mit dem Namen _id_.
+Dies ist für den korrekten Aufbau der Adresse im location header wichtig.
+Der dritte Parameter ist ein beliebiges Objekt, das an den Client zurückgesendet wird.
+
+==== Test mit dem HTTP File
+
+.Eventmanager.Api/Eventmanager.Api.http
+----
+@baseUrl = http://localhost:5080
+
+GET {{baseUrl}}/api/events
+
+###
+
+GET {{baseUrl}}/api/events/2
+
+###
+
+# Request should fail (404 not found)
+GET {{baseUrl}}/api/events/999
+
+###
+
+GET {{baseUrl}}/api/events/2?includeShows=true
+
+###
+
+# Request should work (show 1 has no contingent for floor)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "Floor",
+    "availableTickets": 100
+}
+
+###
+
+# Request should not work (wrong enum value)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "XXX",
+    "availableTickets": 100
+}
+
+###
+
+# Request should not work (show 1 already has a contingent for stands)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "Stands",
+    "availableTickets": 100
+}
+
+###
+----
+==== Verhalten bei Fehlern
+
+Wenn im request body falsche Daten, d. h. Daten die nicht den Validierungsregeln von _CreateContingentCmd_ entsprechen, übermittelt werden, wird automatisch _400 bad request_ mit einer Problembeschreibung gesendet:
+
+[source,json]
+----
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "ContingentType": [
+      "Invalid value for contingent type"
+    ]
+  },
+  "traceId": "00-4600e170ba6f4c2d767cc43afbda64c6-a60d243dcf47d7b5-00"
+}
+----
+
+Wenn unser Service eine Exception wirft, dann senden wir mit der Methode _Problem()_ ebenfalls eine solche Problembeschreibung.
+Sie beinhaltet dann die Fehlermeldung des Services:
+
+[source,json]
+----
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Show has already a contingent for Floor.",
+  "traceId": "00-fe8eb95e7d3a8f42e07fb294f4f42565-681abcd1367f2728-00"
+}
+----
+
+Das folgende Bild zeigt alle Teile, die bei der Bearbeitung des Requests beteiligt sind.
+
+image::post_flow_1405.png[]

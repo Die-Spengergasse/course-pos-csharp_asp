@@ -1,0 +1,51 @@
+@baseUrl = http://localhost:5080
+
+GET {{baseUrl}}/api/events
+
+###
+
+GET {{baseUrl}}/api/events/2
+
+###
+
+# Request should fail (404 not found)
+GET {{baseUrl}}/api/events/999
+
+###
+
+GET {{baseUrl}}/api/events/2?includeShows=true
+
+###
+
+# Request should work (show 1 has no contingent for floor)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "Floor",
+    "availableTickets": 100
+}
+
+###
+
+# Request should not work (wrong enum value)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "XXX",
+    "availableTickets": 100
+}
+
+###
+
+# Request should not work (show 1 already has a contingent for stands)
+POST {{baseUrl}}/api/contingents
+Content-Type: application/json
+{
+    "showId": "1",
+    "contingentType": "Stands",
+    "availableTickets": 100
+}
+
+###

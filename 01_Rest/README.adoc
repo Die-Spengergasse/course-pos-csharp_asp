@@ -1,0 +1,167 @@
+= RESTful APIs mit ASP.NET Core
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+== Was ist REST?
+
+.Beispiel für Softwarekommunikation. Quelle: Google Gemini KI
+image::rest_example_2055.jpg[]
+
+____
+*Representational State Transfer* (abgekürzt REST) ist ein Paradigma für die Softwarearchitektur von verteilten Systemen, insbesondere für Webservices. REST ist eine Abstraktion der Struktur und des Verhaltens des World Wide Web. REST hat das Ziel, einen Architekturstil zu schaffen, der den Anforderungen des modernen Web besser genügt. Dabei unterscheidet sich REST vor allem in der Forderung nach einer einheitlichen Schnittstelle (siehe Abschnitt Prinzipien) von anderen Architekturstilen.
+
+Quelle: https://de.wikipedia.org/wiki/Representational_State_Transfer
+____
+
+Ein zentrales Merkmal von REST ist die *Zustandslosigkeit*.
+Das bedeutet, dass jede Anfrage vom Client an den Server alle Informationen enthalten muss, die zum Verständnis und zur Bearbeitung der Anfrage notwendig sind.
+Der Server speichert keinen Sitzungskontext des Clients; dadurch sind REST-Systeme hervorragend skalierbar und einfach zu warten, da Anfragen unabhängig voneinander bearbeitet werden können.
+
+Für die Interaktion mit Ressourcen verwendet REST standardisierte HTTP-Methoden wie GET (Lesen), POST (Erstellen), PUT (Aktualisieren) und DELETE (Löschen).
+Die Daten werden dabei meist in einem leichtgewichtigen Format wie JSON oder XML übertragen.
+Durch diese Trennung von Client und Server sowie die Nutzung einheitlicher Schnittstellen ermöglicht REST eine flexible Entwicklung, bei der Frontend und Backend weitgehend unabhängig voneinander evolvieren können.
+
+=== Konkretes Beispiel: WebUntis
+
+In einer Stundenplan-App wird der Stundenplan als Ressource behandelt, die über spezifische Parameter (wie die ID einer Klasse) gefiltert wird.
+Eine typische Anfrage nutzt die URL-Struktur, um genau zu definieren, welcher Datensatz benötigt wird.
+
+.HTTP Requests für WebUntis. Quelle: Google Gemini KI
+image::rest_webuntis_2059.jpg[]
+
+Um den Plan für eine bestimmte Klasse abzurufen, sendet der Client eine GET-Anfrage.
+
+* *Methode:* GET
+* *Endpunkt:* /api/v1/lessons
+* *Parameter:* class=6CAIF&week=2026-02-23
+
+*Antwort:*
+
+[source,json]
+----
+[
+    {
+        "id": 4509,
+        "start": "2026-02-23T08:00:00",
+        "end": "2026-02-23T08:50:00",
+        "subject": "POS",
+        "teachers": ["SZ", "WZR"],
+        "room": "C5.10",
+    },
+    ...
+]
+----
+
+Neben dem Lesen können autorisierte Benutzer (z.B. Administratoren) Ressourcen verändern:
+
+* *POST /api/v1/classes:* Erstellt eine neue Klasse.
+* *PATCH /api/v1/lessons/4509:* Ändert den Raum einer spezifischen Stunde (Raumwechsel).
+
+=== Die HTTP Verben im Überblick
+
+[%header,cols="1a,6a",format=tsv]
+|===
+Befehl	Beschreibung
+GET	Fordert die angegebene Ressource vom Server an. GET weist keine Nebeneffekte auf. Der Zustand am Server wird nicht verändert.
+POST	Fügt eine neue (Sub-)Ressource unterhalb der angegebenen Ressource ein. Da die neue Ressource noch keinen URI besitzt, adressiert der URI die übergeordnete Ressource. Als Ergebnis wird der neue Ressourcenlink dem Client zurückgegeben. POST kann im weiteren Sinne auch dazu verwendet werden, Operationen abzubilden, die von keiner anderen Methode abgedeckt werden.
+PUT	Die angegebene Ressource wird angelegt. Wenn die Ressource bereits existiert, wird sie geändert.
+PATCH	Ein Teil der angegebenen Ressource wird geändert. Hierbei sind Nebeneffekte erlaubt.
+DELETE	Löscht die angegebene Ressource.
+HEAD	Fordert Metadaten zu einer Ressource an.
+OPTIONS	Prüft, welche Methoden auf einer Ressource zur Verfügung stehen.
+|===
+
+== Das Richardson Maturity Model
+
+____
+The Richardson Maturity Model (RMM) is a maturity model suggested in 2008 by Leonard Richardson which classifies Web APIs based on their adherence and conformity to each of the model's four levels. The aim of the research of the model as stated by the author was to find out the relationship between the constraints of REST and other forms of web services.
+
+It divides the principal parts of RESTful design into three steps: resource identification (URI), HTTP verbs, and hypermedia controls (e.g. hyperlinks).
+
+The RMM has been cited useful in evaluating the quality of particularly RESTful Web API design (even though it is not restricted to REST alone) and criticized for not addressing how a system could achieve the highest maturity levels of the model as well as for considering a limited number of quality attributes.
+
+Quelle: https://en.wikipedia.org/wiki/Richardson_Maturity_Model
+____
+
+.Richardson Maturity Model. Quelle: Google Gemini KI
+image::richardson_maturity_2103.jpg[]
+
+=== Level 0: The Swamp of POX (Plain Old XML/JSON)
+
+Auf diesem Level wird HTTP lediglich als Transportmedium für Remote Procedure Calls (RPC) genutzt. Es gibt meist nur einen einzigen Endpunkt, und alle Aktionen werden über POST abgewickelt.
+
+* *Endpunkt:* POST /timetableService
+* *Anfrage (Body):* {"action": "getTimetable", "class": "6CAIF", "date": "2026-02-23"}
+* *Charakteristik:* Keine Nutzung von HTTP-Methoden oder URIs zur Ressourcenidentifikation.
+
+=== Level 1: Resources (Ressourcen)
+
+Hier werden individuelle URIs für verschiedene Ressourcen eingeführt. Man spricht nicht mehr einen zentralen Service an, sondern einzelne Objekte.
+
+* /classes
+* /teachers
+* /lessons
+
+Wenn wir den Stundenplan der 6CAIF abrufen wollen, könnte eine Anfrage so aussehen:
+
+* *Endpunkt:* POST /lessons
+* *Anfrage (Body):* {"class": "6CAIF", "date": "2026-02-23"}
+* *Charakteristik:* Ressourcen sind unterscheidbar, aber es wird oft immer noch nur POST für alles verwendet.
+
+=== Level 2: HTTP Verbs (HTTP-Methoden)
+
+In diesem Level werden die HTTP-Methoden korrekt und semantisch genutzt (GET zum Lesen, POST zum Erstellen, DELETE zum Löschen).
+Zudem werden korrekte HTTP-Statuscodes (z. B. 200 OK, 201 Created, 404 Not Found) zurückgegeben.
+
+Als Beispiel dient der oben beschriebene GET Request an _/api/v1/lessons?class=6CAIF_.
+
+=== Level 3: Hypermedia Controls (HATEOAS)
+
+Das höchste Level führt HATEOAS (Hypermedia as the Engine of Application State) ein.
+Die Antwort des Servers enthält Links, die dem Client mitteilen, welche Aktionen als Nächstes möglich sind.
+
+* *Anfrage:* GET /lessons/4509
+
+Antwort (JSON):
+[source,json]
+----
+{
+    "id": 4509,
+    "start": "2026-02-23T08:00:00",
+    "end": "2026-02-23T08:50:00",
+    "subject": "POS",
+    "teachers": ["SZ", "WZR"],
+    "room": "C5.10",
+    "links": [
+        {"rel": "self", "href": "/lessons/4509", "method": "GET"},
+        {"rel": "class_info", "href": "/classes/6CAIF", "method": "GET"},
+        {"rel": "change_room", "href": "/lessons/4509/room", "method": "PUT"},
+    ]
+}
+----
+Charakteristik: Die API ist "selbsterklärend". Der Client muss die URL-Struktur nicht im Voraus kennen, sondern folgt den Links.
+
+==== Zusammenfassung
+
+* *Level 0:* Ein Endpunkt für alles.
+* *Level 1:* Viele Endpunkte für verschiedene Dinge.
+* *Level 2:* Richtige Nutzung von GET, POST, etc.
+* *Level 3:* Die API liefert "Navigationsanweisungen" (Links) mit.
+
+In der Praxis erreichen die meisten modernen APIs Level 2.
+Level 3 ist der "reine" REST-Gedanke, wird aber aufgrund der höheren Komplexität bei der Implementierung seltener vollständig umgesetzt.
+
+=== RESTful vs RESTless
+
+.RESTful vs RESTless. Quelle: https://devopedia.org/richardson-maturity-model
+image::restful_vs_restless.jpg[]
