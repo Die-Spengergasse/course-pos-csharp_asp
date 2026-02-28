@@ -32,7 +32,7 @@ Bei größeren Projekten empfiehlt sich das Anlegen mehrerer Serviceklassen, die
 Das kann z. B. ein _TicketService_, ein _CustomerService_, ein _InvoiceService_, etc. sein.
 Wir legen das Service im _Application Projekt_ an, da es keine Abhängigkeiten zu ASP.NET hat und auch keine haben soll.
 
-.Eventmanager.Application/Services/EventService.cs
+.link:../Eventmanager/Eventmanager.Application/Services/EventService.cs[Eventmanager.Application/Services/EventService.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;
@@ -126,7 +126,7 @@ Unser Controller sollte nicht eine konkrete Implementierung des Services anforde
 Es beinhaltet alle _public_ Methoden und Properties.
 Später können wir durch Mocking Frameworks eine eigene Implementierung zum Testen der Controller erzeugen.
 
-.Eventmanager.Application/Services/IEventService.cs
+.link:../Eventmanager/Eventmanager.Application/Services/IEventService.cs[Eventmanager.Application/Services/IEventService.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;
@@ -189,7 +189,7 @@ Beachte, dass _DateTime_ auch ein Wertetyp ist und den 1.1.0001 als Wert annimmt
 
 Nun wollen wir für den Parameter der Methode _CreateContingent_ ein command object mit dem Namen _CreateContingentCmd_ erstellen:
 
-.Eventmanager.Application/Commands/CreateContingentCmd.cs
+.link:../Eventmanager/Eventmanager.Application/Commands/CreateContingentCmd.cs[Eventmanager.Application/Commands/CreateContingentCmd.cs]
 [source,csharp]
 ----
 using Eventmanager.Model;
@@ -255,7 +255,7 @@ Singleton Service	Es wird zu Programmstart eine Instanz erzeugt, diese wird wäh
 Wir werden immer ein _Scoped Service_ anlegen, da unsere Services schnell instanziert werden können und wir keine Seiteneffekte berücksichtigen müssen.
 Für die Registrierung gibt es die Methode _AddScoped_ des Service Providers, die wir in der Datei _Program.cs_ verwenden.
 
-.Eventmanager.Api/Program.cs
+.link:../Eventmanager/Eventmanager.Api/Program.cs[Eventmanager.Api/Program.cs]
 [source,csharp]
 ----
 public class Program
@@ -307,7 +307,7 @@ ASP wird - wie vorher definiert - das _EventService_ mit den richtigen Parameter
 Wir haben keine Dependency zur Datenbank durch den _EventContext_, da dadurch Prüflogik im Service umgangen werden könnte und das clean code Schema durchbrochen wird.
 ====
 
-.Eventmanager.Api/Controllers/ContingentsController.cs
+.link:../Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[Eventmanager.Api/Controllers/ContingentsController.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;
@@ -392,7 +392,7 @@ Der dritte Parameter ist ein beliebiges Objekt, das an den Client zurückgesende
 
 ==== Test mit dem HTTP File
 
-.Eventmanager.Api/Eventmanager.Api.http
+.link:../Eventmanager/Eventmanager.Api/Eventmanager.Api.http[Eventmanager.Api/Eventmanager.Api.http]
 ----
 @baseUrl = http://localhost:5080
 
@@ -482,3 +482,264 @@ Sie beinhaltet dann die Fehlermeldung des Services:
 Das folgende Bild zeigt alle Teile, die bei der Bearbeitung des Requests beteiligt sind.
 
 image::post_flow_1405.png[]
+
+== Übung
+
+Lade die Datei link:../AspLabs.7z[AspLabs.7z] herunter und entpacke den Inhalt in dein Repo.
+Benenne den Ordner _AspLabs_ in _AspLab02_ um.
+Öffne danach die Datei _Fitnesscenter.sln_ und führe die folgenden Implementierungen durch.
+
+Die Infrastructure und Modelklassen sind bereits fertig implementiert.
+Sie entsprechen dem folgenden Modell:
+
+image::../fitness_2059.svg[]
+
+=== Implementierung des FitnessService
+
+In _Fitnesscenter.Application/Services/FitnessService.cs_ befindet sich die Klasse für das _FitnessService_.
+Implementiere die folgenden Methoden:
+
+==== async Task<Member> CreateMember(CreateMemberCmd cmd)
+
+Diese Methode fügt ein neues Member in die Tabelle _Members_ ein.
+Ist das Property _CreateMemberCmd.IsActive_ auf _true_ gesetzt, wird der Wert von _Member.ActiveSince_ auf das aktuelle Datum gesetzt.
+Verwende dafür die Methode `_timeProvider.GetUtcNow().DateTime`, die vom Time Provider über dependency injection zur Verfügung gestellt wird.
+
+Als Command Object wird folgender Record zur Verfügung gestellt:
+
+.Fitnesscenter.Application/Commands/CreateMemberCmd.cs
+[source,csharp]
+----
+public record CreateMemberCmd(
+    string FirstName, string LastName, string Email,
+    string MembershipType, bool IsActive)
+----
+
+==== async Task<List<Participation>> CreateParticipations(CreateParticipationCmd cmd)
+
+Diese Methode fügt Participations in der Datenbank ein.
+Als Command Object wird folgender Record zur Verfügung gestellt:
+
+.Fitnesscenter.Application/Commands/CreateMemberCmd.cs
+[source,csharp]
+----
+public record CreateParticipationCmd(int MemberId, List<int> TrainingSessionIds)
+----
+
+Da sich ein Kunde für mehrere Participations gleichzeitig anmelden kann, wird eine Liste von Training Sessions übergeben.
+Gehe dabei so vor:
+
+* Wird _CreateParticipationCmd.MemberId_ nicht in der Datenbank gefunden, werfe mit 
+  _throw new FitnessServiceException($"Invalid member id: {cmd.MemberId}.")_ einen Fehler.
+* Ist das geladene Mitglied nicht aktiv (_Member.IsActive_ ist _false_), werfe mit _throw new FitnessServiceException($"Member is not active.")_ einen Fehler.
+* Prüfe, ob jede der übergebenen Session IDs in _CreateParticipationCmd.TrainingSessionIds_ auch in der Datenbank vorhanden ist und keine doppelt vorkommt.
+  Falls dem so ist, werfe mit _throw new FitnessServiceException("Training session id list contains at least one invalid id.")_ einen Fehler.
+  Du kannst dieses Problem beliebig lösen, empfohlen wird:
+  ** Wandle die Liste der TrainingSession IDs mit _ToHashSet()_ in ein _HashSet_ um.
+  ** Frage alle Trainingsessions aus der Datenbank ab, dessen ID in diesem HashSet vorkommt.
+    Dies kann z. B. mit einer _Where_ Methode und der _Contains_ Methode des HashSets gelöst werden, die prüft, ob die Session ID im HashSet vorkommt.
+  ** Prüfe, ob die Anzahl der geladenen Datensätze gleich der Anzahl der Elemente im HashSet sind.
+    Wenn nicht, werfe den Fehler _throw new FitnessServiceException("Training session id list contains at least one invalid id.")_
+* Keine der geladenen Trainingsessions darf voll sein (Anzahl von _TrainingSession.Participations_ = _TrainingSessionMaxParticipantspations_).
+  Falls doch, werfe mit _throw new FitnessServiceException("At least one of the training sessions is already full.")_ einen Fehler.
+* Erstelle für jede der geladenen Training Sessions einen Datensatz für _Participation_.
+  Für den Parameter _rating_ ist _null_ anzugeben.
+  Hinweis: Projiziere die Liste der Training Sessions einfach mit _Select()_ auf eine Liste von Participations.
+
+Verwende für alle Datenbankzugriffe asynchrone Methoden wie _ToListAsync()_, _FirstOrDefaultAsync()_ und _SaveChangesAsync()_.
+
+[TIP]
+====
+Mit dem Test _T01_FitnessServiceSmokeTest_ in _Fitnesscenter.Test/Lab02GradingTests.cs_ kannst du das gesamte Service testen.
+Mache erst weiter, wenn dieser Test erfolgreich durchläuft.
+Der Test testet noch keine Fehlerzustände, diese werden dann in den Controllertests geprüft.
+====
+
+=== Validierung
+
+Für die Validierung in _CreateMemberCmd_ gelten folgende Regeln:
+
+* _FirstName_ muss zwischen 1 und 255 Stellen lang sein.
+  Wenn nicht, wird die Fehlermeldung _Invalid first name._ zurückgegeben.
+* _LastName_ muss zwischen 1 und 255 Stellen lang sein.
+  Wenn nicht, wird die Fehlermeldung _Invalid last name._ zurückgegeben.
+* _Email_ soll mit dem Attribute _EmailAddress_ geprüft werden.
+  Im Fehlerfall soll _Invalid Email._ zurückgegeben werden.
+* Implementiere _IValidatableObject_.
+  Die Validierungsmethode soll prüfen, ob _MembershipType_ nur die Werte _Premium_ oder _Basic_ besitzt.
+  Wenn nicht, wird die Meldung _Invalid membership type._ zurückgegeben.
+
+
+=== Erstellen der Endpunkte
+
+==== Erstellen des Interfaces und Registrieren des Services
+
+Erstelle für das Service ein Interface mit dem Namen _IFitnessService_ im Ordner _Fitnesscenter.Application/Services_.
+Es muss den Namespace _Fitnesscenter.Application.Services_ besitzen.
+Definiere dort alle public Methoden und Properties.
+
+Registriere nun das Service für ASP.NET Core als _Scoped Service_.
+Der _TimeProvider_ ist bereits registriert, du kannst dieses Service mit _GetRequiredService()_ abrufen.
+
+==== Erstellen der Klasse MembersController
+
+Lege in _Fitnesscenter.Api/Controllers_ die Klasse _MembersController_ an.
+Achte auf korrekte Annotations wie _ProducesResponseType_, _HttpGet_, etc.
+Alle Methoden müssen asynchron sein und korrekte Werte zurückgeben.
+Verwende stets _ToListAsync()_ und _FirstOrDefaultAsync()_ zum Lesen der Datenbank.
+
+Sie soll 2 Endpunkte definieren:
+
+===== GET /api/members/{id}
+
+Liefert die Daten eines Members.
+Verwende den Record _MemberDto_ zur Rückgabe der Daten.
+Ergänze wenn nötig das Service um _IQueryable_ Properties, um die Daten lesen zu können.
+
+===== POST /api/members
+
+Erstellt mit Hilfe der Servicemethode _CreateMember_ ein Member in der Datenbank.
+Tritt eine _FitnessServiceException_ auf, gib die Meldung mit _Problem()_ und den Status 400 weiter.
+Im Erfolgsfall wird die ID des erstellten Members zurückgegeben.
+Achte auf den korrekten _Location_ Header.
+
+==== Erstellen der Klasse ParticipationsController
+
+Lege in _Fitnesscenter.Api/Controllers_ die Klasse _ParticipationsController_ an.
+Achte auf korrekte Annotations wie _ProducesResponseType_, _HttpGet_, etc.
+Alle Methoden müssen asynchron sein und korrekte Werte zurückgeben.
+
+Sie soll 2 Endpunkte definieren:
+
+===== GET /api/participations/{id}
+
+Liefert die Daten einer Participation.
+Verwende den Record _ParticipationDto_ zur Rückgabe der Daten.
+Ergänze wenn nötig das Service um _IQueryable_ Properties, um die Daten lesen zu können.
+
+===== POST /api/participations
+
+Erstellt mit Hilfe der Servicemethode _CreateParticipations_ die Participations.
+Tritt eine _FitnessServiceException_ auf, gib die Meldung mit _Problem()_ und den Status 400 weiter.
+Im Erfolgsfall wird eine Liste der Ids der Participations zurückgegeben und mit _ids_ benannt.
+Achte auf den korrekten _Location_ Header.
+
+=== HTTP File und durchführen der Tests
+
+In der Klasse _Fitnesscenter.Test/Lab02GradingTests.cs_ befinden sich Integration Tests für alle Controller.
+Alle Tests müssen erfolgreich durchlaufen.
+
+Um die Applikation schrittweise zu Testen, erstelle die Datei _Fitnesscenter.Api/Fitnesscenter.Api.http_.
+Sie hat folgenden Inhalt:
+
+----
+@baseUrl = http://localhost:5080
+
+# Expected: 400 Bad Request. Invalid first name.
+POST {{baseUrl}}/api/members
+Content-Type: application/json
+{
+    "FirstName": "",
+    "LastName": "Ln",
+    "Email": "fn@mail.at",
+    "MembershipType": "Basic",
+    "IsActive": true
+}
+
+###
+
+# Expected: 400 Bad Request. UNIQUE constraint failed: member.email'.
+POST {{baseUrl}}/api/members
+Content-Type: application/json
+{
+    "FirstName": "Fn",
+    "LastName": "Ln",
+    "Email": "bob@example.com",
+    "MembershipType": "Basic",
+    "IsActive": true
+}
+
+###
+
+# Expected: 400 Bad Request. Wrong membership type.
+POST {{baseUrl}}/api/members
+Content-Type: application/json
+{
+    "FirstName": "Fn",
+    "LastName": "Ln",
+    "Email": "x@y.at",
+    "MembershipType": "XXX",
+    "IsActive": true
+}
+
+###
+
+# Expected: 201 Created. Location: http://localhost:5080/api/Members/6
+# Hint: If you submit this request multiple times, you will receive an email is unique 
+#       error because you are adding the member multiple times.
+#       Restart the server to reset the database.
+POST {{baseUrl}}/api/members
+Content-Type: application/json
+{
+    "FirstName": "Fn",
+    "LastName": "Ln",
+    "Email": "fn@mail.at",
+    "MembershipType": "Basic",
+    "IsActive": true
+}
+
+###
+
+# Expected: 400 Bad Request. Invalid member id: 999
+POST {{baseUrl}}/api/participations
+Content-Type: application/json
+{
+    "memberId": 999,
+    "TrainingSessionIds": [6]
+}
+
+###
+
+# Expected: 400 Bad Request. Member is not active.
+POST {{baseUrl}}/api/participations
+Content-Type: application/json
+{
+    "memberId": 3,
+    "TrainingSessionIds": [6]
+}
+
+###
+
+# Expected: 400 Bad Request. Training session id list contains at least one invalid id.
+POST {{baseUrl}}/api/participations
+Content-Type: application/json
+{
+    "memberId": 4,
+    "TrainingSessionIds": [6,9,999]
+}
+
+###
+
+# Expected: 400 Bad Request. At least one of the training sessions is already full.
+POST {{baseUrl}}/api/participations
+Content-Type: application/json
+{
+    "memberId": 4,
+    "TrainingSessionIds": [6,7,9]
+}
+
+###
+
+
+# Expected: 201 created with location http://localhost:5080/api/Participations/42
+# Hint: If you submit this request multiple times, you will receive a 'member already added' 
+#       error because you are adding the member to the training sessions.
+POST {{baseUrl}}/api/participations
+Content-Type: application/json
+{
+    "memberId": 4,
+    "TrainingSessionIds": [6,9,15]
+}
+
+###
+----

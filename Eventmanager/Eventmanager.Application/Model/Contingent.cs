@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace Eventmanager.Model
@@ -23,6 +24,8 @@ namespace Eventmanager.Model
         public Show Show { get; set; }
         public ContingentType ContingentType { get; set; }
         public int AvailableTickets { get; set; }
+        [ConcurrencyCheck]
+        public long Version { get; set; }
         [JsonIgnore]
         public List<Ticket> Tickets { get; set; } = new();
     }

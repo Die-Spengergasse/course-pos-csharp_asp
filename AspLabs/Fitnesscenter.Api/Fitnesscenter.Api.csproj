@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.*" />
+		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.*" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Fitnesscenter.Application\Fitnesscenter.Application.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Controllers\" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,7 @@
+﻿using Eventmanager.Application.Services;
+using System;
+namespace Eventmanager.Application.Dtos;
+
+public record GuestDto(
+    Id Id,
+    string Firstname, string Lastname, DateOnly BirthDate);

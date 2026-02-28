@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Eventmanager.Services;
+namespace Eventmanager.Application.Services;
 
 [Serializable]
 public class EventServiceException : Exception

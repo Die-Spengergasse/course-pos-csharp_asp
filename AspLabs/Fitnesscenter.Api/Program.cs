@@ -1,5 +1,5 @@
-using Eventmanager.Application.Services;
-using Eventmanager.Infrastructure;
+using Fitnesscenter.Application.Services;
+using Fitnesscenter.Infrastructure;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -14,22 +14,13 @@ public class Program
         // STEP 1: Configuring ASP.NET Core Services
         var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddOpenApi();
-        builder.Services.AddControllers()
-            .AddJsonOptions(opt => opt.JsonSerializerOptions.Converters.Add(new IdConverter()));
+        builder.Services.AddControllers();
 
         // Configure Datebase with settings from appsettings.json (section ConnectionStrings)
-        builder.Services.AddDbContext<EventContext>(options =>
+        builder.Services.AddDbContext<FitnessContext>(options =>
             options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
         builder.Services.AddSingleton<TimeProvider>((provider) => TimeProvider.System);
-
-        builder.Services.AddScoped<IEventService, EventService>((provider) => new EventService(
-            db: provider.GetRequiredService<EventContext>(),
-            timeProvider: provider.GetRequiredService<TimeProvider>(),
-            isDevelopment: builder.Environment.IsDevelopment()));
-
-        Id.Secret = Convert.FromBase64String(
-            builder.Configuration["IdEncoderSecret"] ?? throw new Exception("Missing IdEncoderSecret."));
 
         // STEP 2: Configuring ASP.NET Core request pipeline
         var app = builder.Build();
@@ -42,7 +33,7 @@ public class Program
                 options.SwaggerEndpoint("/openapi/v1.json", "API v1");
             });
             using (var scope = app.Services.CreateScope())
-            using (var service = scope.ServiceProvider.GetRequiredService<EventContext>())
+            using (var service = scope.ServiceProvider.GetRequiredService<FitnessContext>())
             {
                 service.Database.EnsureDeleted();
                 service.Database.EnsureCreated();
@@ -54,4 +45,3 @@ public class Program
         app.Run();
     }
 }
-

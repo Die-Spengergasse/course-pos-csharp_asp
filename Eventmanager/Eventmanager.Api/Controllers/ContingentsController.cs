@@ -1,6 +1,6 @@
 ﻿using Eventmanager.Application.Commands;
 using Eventmanager.Application.Dtos;
-using Eventmanager.Services;
+using Eventmanager.Application.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +48,68 @@ public class ContingentsController : ControllerBase
                 nameof(GetContingentById),      // Name of GET Method to retrieve the resource.
                 new { id = contingent.Id },     // Routing parameter (id)
                 new { id = contingent.Id });    // Created resource.
+        }
+        catch (EventServiceException e)
+        {
+            return Problem(e.Message, statusCode: 400);
+        }
+    }
+
+    [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateContingent([FromRoute] int id, [FromBody] UpdateContingentCmd cmd)
+    {
+        if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
+        try
+        {
+            await _eventService.UpdateContingent(cmd);
+            return NoContent();
+        }
+        catch (EventServiceNotFoundException e)
+        {
+            return Problem(e.Message, statusCode: 404);
+        }
+        catch (EventServiceException e)
+        {
+            return Problem(e.Message, statusCode: 400);
+        }
+    }
+
+    [HttpPatch("{id}/availableTickets")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdateAvailableTickets([FromRoute] int id, [FromBody] UpdateContingentAvailableTicketsCmd cmd)
+    {
+        if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
+        try
+        {
+            await _eventService.UpdateAvailableTickets(cmd);
+            return NoContent();
+        }
+        catch (EventServiceNotFoundException e)
+        {
+            return Problem(e.Message, statusCode: 404);
+        }
+        catch (EventServiceException e)
+        {
+            return Problem(e.Message, statusCode: 400);
+        }
+    }
+
+    [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> DeleteContingents([FromRoute] int id)
+    {
+        try
+        {
+            await _eventService.DeleteContingent(id);
+            return NoContent();
+        }
+        catch (EventServiceNotFoundException e)
+        {
+            return Problem(e.Message, statusCode: 404);
         }
         catch (EventServiceException e)
         {

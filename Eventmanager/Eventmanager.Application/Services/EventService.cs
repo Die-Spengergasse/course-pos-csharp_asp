@@ -6,30 +6,33 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Eventmanager.Services;
+namespace Eventmanager.Application.Services;
 
 
 public class EventService : IEventService
 {
     private readonly EventContext _db;
+    private readonly TimeProvider _timeProvider;
     private readonly bool _isDevelopment;
 
-    public EventService(EventContext db, bool isDevelopment)
+    public EventService(EventContext db, TimeProvider timeProvider, bool isDevelopment)
     {
         _db = db;
+        _timeProvider = timeProvider;
         _isDevelopment = isDevelopment;
     }
 
     public IQueryable<Contingent> Contingents => _db.Contingents.AsQueryable();
+    public IQueryable<Event> Events => _db.Events.AsQueryable();
+    public IQueryable<Show> Shows => _db.Shows.AsQueryable();
 
     public async Task<Contingent> CreateContingent(CreateContingentCmd cmd)
     {
-        var show = await _db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId);
-        if (show is null)
-            throw new EventServiceException($"Show {cmd.ShowId} not found.");
-
         if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
             throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
+
+        var show = await _db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
+            ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
 
         if (_db.Contingents.Any(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
             throw new EventServiceException($"Show has already a contingent for {cmd.ContingentType}.");
@@ -40,16 +43,76 @@ public class EventService : IEventService
         return contingent;
     }
 
+    public async Task UpdateContingent(UpdateContingentCmd cmd)
+    {
+        if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
+            throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
+
+        var contingent = await _db.Contingents
+            .FirstOrDefaultAsync(c => c.Id == cmd.Id)
+            ?? throw new EventServiceNotFoundException($"Contingent {cmd.Id} not found.");
+
+        if (contingent.Version != cmd.Version)
+            throw new EventServiceException($"The contingent has already changed.");
+
+        var show = await _db.Shows
+            .FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
+            ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
+
+        contingent.Show = show;
+        contingent.ContingentType = contingentType;
+        contingent.AvailableTickets = cmd.AvailableTickets;
+        contingent.Version = _timeProvider.GetTimestamp();
+        // UPDATE "Contingents" SET "AvailableTickets" = 80, "ContingentType" = Floor, "Version" = 639080503086892609
+        // WHERE "Id" = 1 AND "Version" = 0
+        // RETURNING 1;
+        await SaveChanges();
+    }
+
+    public async Task UpdateAvailableTickets(UpdateContingentAvailableTicketsCmd cmd)
+    {
+        var contingent = await _db.Contingents
+            .Include(c => c.Tickets)
+            .FirstOrDefaultAsync(c => c.Id == cmd.Id)
+            ?? throw new EventServiceNotFoundException($"Contingent {cmd.Id} not found.");
+
+        if (cmd.AvailableTickets < contingent.Tickets.Sum(t => t.Pax + 1))
+            throw new EventServiceException($"The number of tickets sold or reserved exceeds the number of tickets currently available.");
+
+        contingent.AvailableTickets = cmd.AvailableTickets;
+        contingent.Version = _timeProvider.GetTimestamp();
+        await SaveChanges();
+    }
+
+    public async Task DeleteContingent(int id)
+    {
+        var contingent = await _db.Contingents
+            .Include(c => c.Tickets)
+            .FirstOrDefaultAsync(c => c.Id == id)
+            ?? throw new EventServiceNotFoundException($"Contingent {id} not found.");
+
+        if (contingent.Tickets.Any())
+            throw new EventServiceException("The contingent has already sold or reserved all the tickets.");
+
+        _db.Contingents.Remove(contingent);
+        await SaveChanges();
+    }
+
     private async Task SaveChanges()
     {
         try
         {
             await _db.SaveChangesAsync();
         }
+        catch (DbUpdateConcurrencyException e)
+        {
+            var message = _isDevelopment ? e.InnerException?.Message ?? e.Message : "The record has already changed.";
+            throw new EventServiceException(message);
+        }
         catch (DbUpdateException e)
         {
             var message = _isDevelopment ? e.InnerException?.Message ?? e.Message : "Cannot write changes to database.";
-            throw new EventServiceException(e.InnerException?.Message ?? e.Message);
+            throw new EventServiceException(message);
         }
     }
 }
