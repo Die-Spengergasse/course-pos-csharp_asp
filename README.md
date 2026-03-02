@@ -8,6 +8,7 @@
 - [Die erste ASP.NET Core App](./02_ASP_Intro/README.adoc)
 - [Controller in ASP.NET Core: GET Routen](./03_Get_Routes/README.adoc)
 - [POST Routen, Services und Validierung](./04_Post_Routes/README.adoc)
+- [PUT, PATCH und DELETE](./05_Put_Patch_Delete_Routes/README.adoc)
 
 ### Installation von Visual Studio 2026
 
