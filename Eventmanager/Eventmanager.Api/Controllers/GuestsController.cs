@@ -23,7 +23,7 @@ namespace Eventmanager.Api.Controllers
 
         [HttpGet]
         [ProducesResponseType<List<GuestDto>>(StatusCodes.Status200OK)]
-        public async Task<ActionResult<EventDto>> GetGuests()
+        public async Task<ActionResult<List<GuestDto>>> GetGuests()
         {
             var guests = await _db.Guests
                 .Select(g => new GuestDto(
@@ -35,7 +35,7 @@ namespace Eventmanager.Api.Controllers
         [HttpGet("{id}")]
         [ProducesResponseType<GuestDto>(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<EventDto>> GetGuestById([FromRoute] Id id)
+        public async Task<ActionResult<GuestDto>> GetGuestById([FromRoute] Id id)
         {
             var guest = await _db.Guests
                 .Where(g => g.Id == id.Value)

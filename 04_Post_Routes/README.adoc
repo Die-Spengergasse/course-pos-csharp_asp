@@ -61,14 +61,13 @@ public class EventService
 
     public async Task<Contingent> CreateContingent(CreateContingentCmd cmd)      // <3>
     {
-        var show = await _db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId);
-        if (show is null)
-            throw new EventServiceException($"Show {cmd.ShowId} not found.");
-
         if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
             throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
 
-        if (_db.Contingents.Any(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
+        var show = await _db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
+            ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
+
+        if (await _db.Contingents.AnyAsync(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
             throw new EventServiceException($"Show has already a contingent for {cmd.ContingentType}.");
 
         var contingent = new Contingent(show, contingentType, cmd.AvailableTickets);
@@ -88,7 +87,7 @@ public class EventService
             var message = _isDevelopment 
                 ? e.InnerException?.Message ?? e.Message 
                 : "Cannot write changes to database.";
-            throw new EventServiceException(e.InnerException?.Message ?? e.Message);
+            throw new EventServiceException(message);
         }
     }
 }
@@ -334,7 +333,7 @@ public class ContingentsController : ControllerBase
 
     [HttpGet("{id}")]
     [ProducesResponseType<ContingentDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ContingentDto>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ContingentDto>> GetContingentById(int id)
     {
         var contingent = await _eventService.Contingents

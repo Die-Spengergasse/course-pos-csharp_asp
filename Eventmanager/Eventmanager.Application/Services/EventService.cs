@@ -34,7 +34,7 @@ public class EventService : IEventService
         var show = await _db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
             ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
 
-        if (_db.Contingents.Any(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
+        if (await _db.Contingents.AnyAsync(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
             throw new EventServiceException($"Show has already a contingent for {cmd.ContingentType}.");
 
         var contingent = new Contingent(show, contingentType, cmd.AvailableTickets);

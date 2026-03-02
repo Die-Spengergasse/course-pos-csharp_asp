@@ -319,13 +319,16 @@ Definiere sie daher in der DTO Klasse als _DateTime_.
 Liefert eine Liste aller Participations (Teilnahme an Trainingseinheiten), die das Mitglied gebucht hat.
 Erstelle eine DTO Klasse, die folgende JSON Antwort der API liefert (Beispielwerte):
 
-[source,json]
+[source,javascript]
 ----
-{
-    "trainerId": 9999, "trainerFirstName": "string", "trainerLastName": "string",
-    "roomName": "string", "time": "string", "type": "string", "duration": 9999,
-    "rating": 9999
-}
+[
+    {
+        "trainerId": 9999, "trainerFirstName": "string", "trainerLastName": "string",
+        "roomName": "string", "time": "string", "type": "string", "duration": 9999,
+        "rating": 9999
+    }
+    // ...
+]
 ----
 
 Die Werte für _roomName_, _time_, _type_ und _duration_ stehen in der Modelklasse _TrainingSession_ bzw. _Room_.

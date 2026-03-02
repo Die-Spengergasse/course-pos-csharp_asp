@@ -22,7 +22,7 @@ public class ContingentsController : ControllerBase
 
     [HttpGet("{id}")]
     [ProducesResponseType<ContingentDto>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ContingentDto>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ContingentDto>> GetContingentById(int id)
     {
         var contingent = await _eventService.Contingents
@@ -58,6 +58,7 @@ public class ContingentsController : ControllerBase
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateContingent([FromRoute] int id, [FromBody] UpdateContingentCmd cmd)
     {
         if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
@@ -79,6 +80,7 @@ public class ContingentsController : ControllerBase
     [HttpPatch("{id}/availableTickets")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateAvailableTickets([FromRoute] int id, [FromBody] UpdateContingentAvailableTicketsCmd cmd)
     {
         if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
@@ -100,6 +102,7 @@ public class ContingentsController : ControllerBase
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteContingents([FromRoute] int id)
     {
         try
