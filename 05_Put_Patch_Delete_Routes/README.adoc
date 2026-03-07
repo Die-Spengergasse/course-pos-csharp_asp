@@ -94,19 +94,8 @@ Das Service wird durch eine Methode _UpdateContingent_ ergänzt.
 .link:../Eventmanager/Eventmanager.Application/Services/EventService.cs[Eventmanager.Application/Services/EventService.cs]
 [source,csharp]
 ----
-public class EventService : IEventService
+public class EventService(EventContext db, bool isDevelopment, TimeProvider timeProvider) : IEventService
 {
-    private readonly EventContext _db;
-    private readonly bool _isDevelopment;
-    private readonly TimeProvider _timeProvider;
-
-    public EventService(EventContext db, bool isDevelopment, TimeProvider timeProvider)
-    {
-        _db = db;
-        _isDevelopment = isDevelopment;
-        _timeProvider = timeProvider;
-    }
-    
     // ....
 
     public async Task UpdateContingent(UpdateContingentCmd cmd)
@@ -114,21 +103,24 @@ public class EventService : IEventService
         if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
             throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
 
-        var contingent = await _db.Contingents
+        var contingent = await db.Contingents
             .FirstOrDefaultAsync(c => c.Id == cmd.Id)
             ?? throw new EventServiceNotFoundException($"Contingent {cmd.Id} not found.");
 
         if (contingent.Version != cmd.Version)
             throw new EventServiceException($"The contingent has already changed.");
 
-        var show = await _db.Shows
+        var show = await db.Shows
             .FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
             ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
 
         contingent.Show = show;
         contingent.ContingentType = contingentType;
         contingent.AvailableTickets = cmd.AvailableTickets;
-        contingent.Version = _timeProvider.GetTimestamp();
+        contingent.Version = timeProvider.GetTimestamp();
+        // UPDATE "Contingents" SET "AvailableTickets" = 80, "ContingentType" = Floor, "Version" = 639080503086892609
+        // WHERE "Id" = 1 AND "Version" = 0
+        // RETURNING 1;
         await SaveChanges();
     }
 
@@ -136,16 +128,16 @@ public class EventService : IEventService
     {
         try
         {
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException e)
         {
-            var message = _isDevelopment ? e.InnerException?.Message ?? e.Message : "The record has already changed.";
+            var message = isDevelopment ? e.InnerException?.Message ?? e.Message : "The record has already changed.";
             throw new EventServiceException(message);
         }
         catch (DbUpdateException e)
         {
-            var message = _isDevelopment ? e.InnerException?.Message ?? e.Message : "Cannot write changes to database.";
+            var message = isDevelopment ? e.InnerException?.Message ?? e.Message : "Cannot write changes to database.";
             throw new EventServiceException(message);
         }
     }
@@ -244,7 +236,7 @@ private async Task SaveChanges()
 {
     try
     {
-        await _db.SaveChangesAsync();
+        await db.SaveChangesAsync();
     }
     catch (DbUpdateConcurrencyException e)
     {
@@ -271,16 +263,9 @@ Deswegen muss der Server keine Daten zurückliefern.
 ----
 [Route("api/[controller]")]
 [ApiController]
-public class ContingentsController : ControllerBase
+public class ContingentsController(IEventService eventService) : ControllerBase
 {
-    private readonly IEventService _eventService;
-
-    public ContingentsController(IEventService eventService)
-    {
-        _eventService = eventService;
-    }
-
-    // ....
+    /* ... */
 
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -291,7 +276,7 @@ public class ContingentsController : ControllerBase
         if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
         try
         {
-            await _eventService.UpdateContingent(cmd);
+            await eventService.UpdateContingent(cmd);
             return NoContent();
         }
         catch (EventServiceNotFoundException e)
@@ -303,7 +288,6 @@ public class ContingentsController : ControllerBase
             return Problem(e.Message, statusCode: 400);
         }
     }
-
 }
 ----
 
@@ -338,7 +322,7 @@ Da wir das Verhalten "last one wins" akzeptieren, prüfen wir allerdings nicht i
 ----
 public async Task UpdateAvailableTickets(UpdateContingentAvailableTicketsCmd cmd)
 {
-    var contingent = await _db.Contingents
+    var contingent = await db.Contingents
         .Include(c => c.Tickets)
         .FirstOrDefaultAsync(c => c.Id == cmd.Id)
         ?? throw new EventServiceNotFoundException($"Contingent {cmd.Id} not found.");
@@ -359,16 +343,9 @@ Im _ContingentsController_ ist diese Methode mit dem entsprechenden _HttpPatch_ 
 ----
 [Route("api/[controller]")]
 [ApiController]
-public class ContingentsController : ControllerBase
+public class ContingentsController(IEventService eventService) : ControllerBase
 {
-    private readonly IEventService _eventService;
-
-    public ContingentsController(IEventService eventService)
-    {
-        _eventService = eventService;
-    }
-
-    // ....
+    /* ... */
     [HttpPatch("{id}/availableTickets")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -378,7 +355,7 @@ public class ContingentsController : ControllerBase
         if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
         try
         {
-            await _eventService.UpdateAvailableTickets(cmd);
+            await eventService.UpdateAvailableTickets(cmd);
             return NoContent();
         }
         catch (EventServiceNotFoundException e)
@@ -408,7 +385,7 @@ Wir brauchen nur die ID als eindeutige Identifizierung.
 ----
 public async Task DeleteContingent(int id)
 {
-    var contingent = await _db.Contingents
+    var contingent = await db.Contingents
         .Include(c => c.Tickets)
         .FirstOrDefaultAsync(c => c.Id == id)
         ?? throw new EventServiceNotFoundException($"Contingent {id} not found.");
@@ -416,7 +393,7 @@ public async Task DeleteContingent(int id)
     if (contingent.Tickets.Any())
         throw new EventServiceException("The contingent has already sold or reserved all the tickets.");
 
-    _db.Contingents.Remove(contingent);
+    db.Contingents.Remove(contingent);
     await SaveChanges();
 }
 ----
@@ -427,15 +404,9 @@ Der Controller ruft wie gewohnt das Service auf und gibt _204 no content_ im Erf
 ----
 [Route("api/[controller]")]
 [ApiController]
-public class ContingentsController : ControllerBase
+public class ContingentsController(IEventService eventService) : ControllerBase
 {
-    private readonly IEventService _eventService;
-
-    public ContingentsController(IEventService eventService)
-    {
-        _eventService = eventService;
-    }
-
+    /* ... */
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -444,7 +415,7 @@ public class ContingentsController : ControllerBase
     {
         try
         {
-            await _eventService.DeleteContingent(id);
+            await eventService.DeleteContingent(id);
             return NoContent();
         }
         catch (EventServiceNotFoundException e)

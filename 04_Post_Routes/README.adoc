@@ -45,33 +45,23 @@ using System.Threading.Tasks;
 
 namespace Eventmanager.Services;
 
-
-public class EventService
+public class EventService(EventContext db, bool isDevelopment)    // <1>
 {
-    private readonly EventContext _db;
-    private readonly bool _isDevelopment;
-
-    public EventService(EventContext db, bool isDevelopment)    // <1>
-    {
-        _db = db;
-        _isDevelopment = isDevelopment;
-    }
-
-    public IQueryable<Contingent> Contingents => _db.Contingents.AsQueryable();  // <2>
+    public IQueryable<Contingent> Contingents => db.Contingents.AsQueryable();  // <2>
 
     public async Task<Contingent> CreateContingent(CreateContingentCmd cmd)      // <3>
     {
         if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
             throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
 
-        var show = await _db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
+        var show = await db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
             ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
 
-        if (await _db.Contingents.AnyAsync(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
+        if (await db.Contingents.AnyAsync(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
             throw new EventServiceException($"Show has already a contingent for {cmd.ContingentType}.");
 
         var contingent = new Contingent(show, contingentType, cmd.AvailableTickets);
-        _db.Add(contingent);
+        db.Add(contingent);
         await SaveChanges();
         return contingent;
     }
@@ -80,20 +70,18 @@ public class EventService
     {
         try
         {
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
         catch (DbUpdateException e)
         {
-            var message = _isDevelopment 
-                ? e.InnerException?.Message ?? e.Message 
-                : "Cannot write changes to database.";
+            var message = isDevelopment ? e.InnerException?.Message ?? e.Message : "Cannot write changes to database.";
             throw new EventServiceException(message);
         }
     }
 }
 ----
 
-<1> Über _dependency injection_ soll später ASP.NET Core eine Instanz des _EventContext_ bereitstellen.
+<1> Über _dependency injection_ und dem _primary constructor_ (C# 12) soll später ASP.NET Core eine Instanz des _EventContext_ bereitstellen.
     Wir erzeugen niemals im Service mit _new_ eine Instanz der Datenbankverbindung!
     Die Variable _isDevelopment_ wird später bei der Registrierung des Services gesetzt.
     Sie ermöglicht im Inneren des Services das Ausführen von speziellem Code, der nur im Development Mode verfügbar sein soll.
@@ -322,21 +310,14 @@ namespace Eventmanager.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class ContingentsController : ControllerBase
+public class ContingentsController(IEventService eventService) : ControllerBase
 {
-    private readonly IEventService _eventService;
-
-    public ContingentsController(IEventService eventService)
-    {
-        _eventService = eventService;
-    }
-
     [HttpGet("{id}")]
     [ProducesResponseType<ContingentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ContingentDto>> GetContingentById(int id)
     {
-        var contingent = await _eventService.Contingents
+        var contingent = await eventService.Contingents
             .Where(c => c.Id == id)
             .Select(c => new ContingentDto(
                 c.Id, c.Show.Id, c.Show.Date,
@@ -353,7 +334,7 @@ public class ContingentsController : ControllerBase
     {
         try
         {
-            var contingent = await _eventService.CreateContingent(cmd);
+            var contingent = await eventService.CreateContingent(cmd);
             // Return 201 created and set the location header to the uri of the created resource (/api/contingents/{id})
             return CreatedAtAction(
                 nameof(GetContingentById),      // Name of GET Method to retrieve the resource.

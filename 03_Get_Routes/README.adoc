@@ -177,6 +177,37 @@ builder.Services.AddDbContext<EventContext>(options =>
 Nun können wir in unserem Controller einfach im Konstruktor den Typ _EventContext_ anfordern.
 ASP.NET Core wird bei jedem Request eine Instanz nach dieser Vorschrift erzeugen und sie dem Controller übergeben.
 
+=== Der primary constructor in C# 12
+
+Unser Controller definiert einen Konstruktor, der die _private readonly_ Variable __db_ initialisiert.
+Seit C# 12 kann die Deklaration und Initialisierung mit Hilfe eines _primary constructors_ vereinfacht werden.
+Wir schreiben bei der Klassendeklaration direkt die Argumente des Konstruktors.
+C# generiert dann eine _private readonly_ Variable mit diesem Namen und weist diese zu.
+
+[source,csharp]
+----
+[Route("api/[controller]")]
+[ApiController]
+public class EventsController(EventContext db) : ControllerBase    // <1>
+{
+    [HttpGet]
+    [ProducesResponseType<List<EventDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<EventDto>>> GetAllEvents()
+    {
+        var events = await db.Events    // <2>
+            .Select(e => new EventDto(e.Id, e.Name, e.Shows.Count))
+            .ToListAsync();
+        return Ok(events);
+    }
+    /* .... */
+}
+----
+
+<1> Der Konstruktor wird direkt bei der Deklaration der Klasse angegeben.
+    Das Schreiben eines eigenen Konstruktors entfällt.
+
+<2> Die Variable _db_ steht in der Klasse zur Verfügung.
+
 === Die Klassen _Task_ und _ActionResult_
 
 Bisher haben wir die Datenbank _blockierend_ mit _ToList()_, _FirstOrDefault()_ abgefragt.
