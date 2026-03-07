@@ -10,6 +10,10 @@
 - [POST Routen, Services und Validierung](./04_Post_Routes/README.adoc)
 - [PUT, PATCH und DELETE](./05_Put_Patch_Delete_Routes/README.adoc)
 
+### Testen
+
+- [Integration Tests mit ASP.NET Core](./10_Integration_Tests/README.adoc)
+
 ### Installation von Visual Studio 2026
 
 Lade von https://visualstudio.microsoft.com/de/downloads/ die *Enterprise* Version von Visual Studio 2026 herunter.
