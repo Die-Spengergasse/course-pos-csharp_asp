@@ -1,5 +1,6 @@
 using Eventmanager.Application.Services;
 using Eventmanager.Infrastructure;
+using IdHasher;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

@@ -11,21 +11,14 @@ namespace Eventmanager.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class ContingentsController : ControllerBase
+public class ContingentsController(IEventService eventService) : ControllerBase
 {
-    private readonly IEventService _eventService;
-
-    public ContingentsController(IEventService eventService)
-    {
-        _eventService = eventService;
-    }
-
     [HttpGet("{id}")]
     [ProducesResponseType<ContingentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ContingentDto>> GetContingentById(int id)
     {
-        var contingent = await _eventService.Contingents
+        var contingent = await eventService.Contingents
             .Where(c => c.Id == id)
             .Select(c => new ContingentDto(
                 c.Id, c.Show.Id, c.Show.Date,
@@ -42,7 +35,7 @@ public class ContingentsController : ControllerBase
     {
         try
         {
-            var contingent = await _eventService.CreateContingent(cmd);
+            var contingent = await eventService.CreateContingent(cmd);
             // Return 201 created and set the location header to the uri of the created resource (/api/contingents/{id})
             return CreatedAtAction(
                 nameof(GetContingentById),      // Name of GET Method to retrieve the resource.
@@ -64,7 +57,7 @@ public class ContingentsController : ControllerBase
         if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
         try
         {
-            await _eventService.UpdateContingent(cmd);
+            await eventService.UpdateContingent(cmd);
             return NoContent();
         }
         catch (EventServiceNotFoundException e)
@@ -86,7 +79,7 @@ public class ContingentsController : ControllerBase
         if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
         try
         {
-            await _eventService.UpdateAvailableTickets(cmd);
+            await eventService.UpdateAvailableTickets(cmd);
             return NoContent();
         }
         catch (EventServiceNotFoundException e)
@@ -107,7 +100,7 @@ public class ContingentsController : ControllerBase
     {
         try
         {
-            await _eventService.DeleteContingent(id);
+            await eventService.DeleteContingent(id);
             return NoContent();
         }
         catch (EventServiceNotFoundException e)

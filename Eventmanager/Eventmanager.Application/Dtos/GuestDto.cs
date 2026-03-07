@@ -1,7 +1,8 @@
-﻿using Eventmanager.Application.Services;
+﻿using Hypermedia;
+using IdHasher;
 using System;
 namespace Eventmanager.Application.Dtos;
 
 public record GuestDto(
     Id Id,
-    string Firstname, string Lastname, DateOnly BirthDate);
+    string Firstname, string Lastname, DateOnly BirthDate) : HypermediaDto;

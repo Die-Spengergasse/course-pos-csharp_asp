@@ -11,19 +11,13 @@ namespace Eventmanager.Api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class EventsController : ControllerBase
+public class EventsController(EventContext db) : ControllerBase
 {
-    private readonly EventContext _db;
-
-    public EventsController(EventContext db)
-    {
-        _db = db;
-    }
     [HttpGet]
     [ProducesResponseType<List<EventDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<EventDto>>> GetAllEvents()
     {
-        var events = await _db.Events
+        var events = await db.Events
             .Select(e => new EventDto(e.Id, e.Name, e.Shows.Count))
             .ToListAsync();
         return Ok(events);
@@ -36,7 +30,7 @@ public class EventsController : ControllerBase
         [FromRoute] int id,
         [FromQuery] bool includeShows = false)
     {
-        var eventData = await _db.Events
+        var eventData = await db.Events
             .Where(e => e.Id == id)
             .Select(e => new EventWithShowsDto(
                 e.Id, e.Name,

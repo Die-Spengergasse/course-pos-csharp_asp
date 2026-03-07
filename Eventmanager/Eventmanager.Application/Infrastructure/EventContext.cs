@@ -104,7 +104,7 @@ namespace Eventmanager.Infrastructure
             // 30% of the contingents are sold out.
             var tickets = contingents.SelectMany(c =>
                 GenerateTickets(
-                    c, guests,
+                    c, guests[2..],
                     faker.Random.Bool(0.3f) ? c.AvailableTickets : faker.Random.Int(0, c.AvailableTickets)))
                 .ToList();
             Tickets.AddRange(tickets);
