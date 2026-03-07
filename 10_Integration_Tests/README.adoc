@@ -40,9 +40,69 @@ Das Schema _Arrange - Act - Assert_ ist auch hier erkennbar.
 
 == Integration Tests mit ASP.NET Core
 
+=== Der Time Provider und der FakeTimeProvider
+
+In den Übungen wurde im _FitnessService_ über dependency injection die Klasse _TimeProvider_ aus dem .NET Framework angefordert.
+Das dazugehörige Service wurde in der Datei Program.cs registriert:
+
+[source,csharp]
+----
+builder.Services.AddSingleton<TimeProvider>((provider) => TimeProvider.System);
+----
+
+Der Grund ist die Vermeidung von _DateTime.Now_ bzw. _DateTime.UtcNow_ im Service.
+Wenn wir z. B. bei einer Reservierung testen möchten, ob eine Show mindestens 14 Tage in der Zukunft liegt, würde dies nach klassischem Muster so aussehen:
+
+[source,csharp]
+----
+public async Task<int> CreateReservation(int guestId, int contingentId, int pax, DateTime dateTime)
+{
+    var contingent = await _db.Contingents
+        .Include(c => c.Show).Include(c => c.Tickets)
+        .FirstOrDefaultAsync(c => c.Id == contingentId)
+        ?? throw new EventServiceException("Invalid contingent id.");
+    if (contingent.Show.Date < DateTime.Now.AddDays(14))
+        throw new EventServiceException("The show is too close in time.");
+    /* ... */
+}
+----
+
+Probleme ergeben sich beim Testen: Ein Unittest, der die Methode _CreateReservation_ prüft und erfolgreich durchläuft, wird vielleicht in 1 Monat fehlschlagen.
+Lösungen wie das Verwenden von _DateTime.Now_ im Unittest sind problematisch, da der Test dadurch nicht _deterministisch_ aufgebaut ist.
+
+Daher gibt es seit .NET 8 die abstrakte Klasse link:https://learn.microsoft.com/en-us/dotnet/api/system.timeprovider[_TimeProvider_] im Namespace _System_.
+Diese Klasse kann unser Service im Konstruktor anfordern.
+Im Service selbst sieht die Methode _CreateReservation_ nun so aus:
+
+[source,csharp]
+----
+public async Task<int> CreateReservation(int guestId, int contingentId, int pax, DateTime dateTime)
+{
+    var contingent = await _db.Contingents
+        .Include(c => c.Show).Include(c => c.Tickets)
+        .FirstOrDefaultAsync(c => c.Id == contingentId)
+        ?? throw new EventServiceException("Invalid contingent id.");
+    if (contingent.Show.Date < timeProvider.GetLocalNow().DateTime.AddDays(14))    // <1>
+        throw new EventServiceException("The show is too close in time.");
+    /* ... */
+}
+----
+
+<1> Die Methode _GetLocalNow()_ liefert ein _DateTimeOffset_ mit der aktuellen Systemzeit.
+    Das Property _DateTime_ ruft den Datums- und Zeitwert ohne Zeitzone ab.
+
+Im Paket _Microsoft.Extensions.TimeProvider.Testing_, das über NuGet installiert werden muss, steht die Klasse _FakeTimeProvider_ bereit.
+Wenn wir nun das Service testen möchten, können wir mit folgendem Code die Zeit fix auf den 28.2.2026 um 16:30 UTC (0h Offet) festlegen:
+
+[source,csharp]
+----
+var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 2, 28, 16, 30, 0, TimeSpan.Zero));
+var service = new EventService(..., timeProvider);
+----
+
 === Das Paket _Microsoft.AspNetCore.Mvc.Testing_
 
-Die obigen Punkte erfordern einiges an Vorbereitung.
+Das Durchführen eines Integration Tests erfordert mehr Vorbereitung als der klassische Unittest auf Methodenebene.
 Der Testserver soll automatisiert mit dem Unittest gestartet werden und einen zufälligen, freien Port belegen.
 Microsoft stellt mit dem Paket _Microsoft.AspNetCore.Mvc.Testing_ die Klasse _WebApplicationFactory_ bereit, die diese Aufgaben erledigt.
 Sie ist als _Basisklasse_ für eine eigene Implementierung gedacht und besitzt die zentrale Methode _ConfigureWebHost_.
@@ -199,4 +259,118 @@ Braucht man z. B. einen _DateTime_ Wert als Parameter, muss man diesen als Strin
 
 === Konkrete Verwendung im Integration Test
 
-In link:../Eventmanager/Eventmanager.Test/ContingentsControllerTests.cs[🔗 ContingentsControllerTests.cs] werden alle Methoden eines Controllers getestet.
+Die folgende Klasse zeigt den Test des link:../Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[ContingentsControllers]
+mit Hilfe der Hilfsklasse link:../Eventmanager/Eventmanager.Test/TestWebApplicationFactory.cs[TestWebApplicationFactory].
+
+.link:../Eventmanager/Eventmanager.Test/ContingentsControllerTests.cs[Eventmanager.Test/ContingentsControllerTests.cs]
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Dtos;
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using Microsoft.Extensions.Time.Testing;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Test;
+
+public class ContingentsControllerTests : IDisposable
+{
+    private readonly TestWebApplicationFactory<EventContext> _factory;
+    private readonly TimeProvider _timeProvider;
+    public ContingentsControllerTests()
+    {
+        _timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 2, 28, 16, 30, 0, TimeSpan.Zero));
+        _factory = new TestWebApplicationFactory<EventContext>(_timeProvider);
+    }
+    /// <summary>
+    /// Creates global test data for all unit tests.
+    /// </summary>
+    private void GenerateFixtures()
+    {
+        _factory.InitializeDatabase(db =>
+        {
+            var @event = new Event("Event1");
+            var show = new Show(@event, new DateTime(2026, 3, 7, 14, 0, 0, DateTimeKind.Utc));
+            var contingent = new Contingent(show, ContingentType.Rang, 10);
+            db.AddRange(show, contingent);
+            db.SaveChanges();
+        });
+    }
+    /// <summary>
+    /// Checks whether GET /api/contingents/{id} returns HTTP 200 and a ContingentDto.
+    /// </summary>
+    [Fact]
+    public async Task GetContingentByIdReturns200WithDataTest()
+    {
+        GenerateFixtures();
+        var (response, contingent) = await _factory.GetHttpContent<ContingentDto>("/api/contingents/1");
+        Assert.Equal(200, (int)response.StatusCode);
+        Assert.NotNull(contingent);
+        Assert.True(contingent.Id != default);
+    }
+    /// <summary>
+    /// Checks whether POST /api/contingents returns HTTP 201 with ID and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task CreateContingentReturns201Test()
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PostHttpContent(
+            "/api/contingents",
+            new CreateContingentCmd(1, "Floor", 10));
+        Assert.Equal(201, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.First(c => c.Id == 2));
+        Assert.True(contingentFromDb.Id != default);
+        Assert.True(content.GetProperty("id").GetInt32() != default);
+    }
+    /// <summary>
+    /// Checks whether PUT /api/contingents/{id} returns HTTP 204 and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task UpdateContingentReturns204Test()
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PutHttpContent(
+            "/api/contingents/1",
+            new UpdateContingentCmd(1, 1, "Floor", 10, 0));
+        Assert.Equal(204, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.First(c => c.Id == 1));
+        Assert.True(contingentFromDb.ContingentType == ContingentType.Floor);
+    }
+    /// <summary>
+    /// Checks whether DELETE /api/contingents/{id} returns HTTP 204 and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task DeleteContingentReturns204Test()
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.DeleteHttpContent("/api/contingents/1");
+        Assert.Equal(204, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.FirstOrDefault(c => c.Id == 1));
+        Assert.Null(contingentFromDb);
+    }
+    /// <summary>
+    /// Checks whether POST /api/contingents returns HTTP 400 with the corresponding error message in the problem detail.
+    /// </summary>
+    [Theory]
+    [InlineData("xxx", 1, "invalid value for contingent type")]
+    [InlineData("Floor", 999, "show 999 not found")]
+    [InlineData("Rang", 1, "show has already a contingent for")]
+    public async Task CreateContingentReturns400WithProblemDetailTest(string contingentType, int showId, string errorMessage)
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PostHttpContent(
+            "/api/contingents",
+            new CreateContingentCmd(showId, contingentType, 10));
+        Assert.Equal(400, (int)response.StatusCode);
+        Assert.True(_factory.ContentContainsErrorMessage(content, errorMessage));
+    }
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
+}
+----
