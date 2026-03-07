@@ -490,3 +490,188 @@ DELETE {{baseUrl}}/api/contingents/44
 
 ####
 ----
+
+== Übung
+
+Lade die Datei link:../AspLabs.7z[AspLabs.7z] herunter und entpacke den Inhalt in dein Repo.
+Benenne den Ordner _AspLabs_ in _AspLab03_ um.
+Öffne danach die Datei _Fitnesscenter.sln_ und führe die folgenden Implementierungen durch.
+
+Die Infrastructure und Modelklassen sind bereits fertig implementiert.
+Sie entsprechen dem folgenden Modell:
+
+image::../fitness_2059.svg[]
+
+=== Versionierung für die Trainingsession
+
+Füge in der Modelklasse _TrainingSession_ befindet sich ein Property _Version_ vom Typ _long_.
+Es wird für die Versionierung verwendet.
+Achte beim Schreiben darauf, dass die Version mit der Version im command object übereinstimmt.
+
+=== Validierung und Command Objects
+
+==== UpdateTrainingSessionCmd
+
+Füge im record _Fitnesscenter.Application/Commands/UpdateTrainingSessionCmd.cs_ Validierungen hinzu:
+
+* Alle int Werte müssen im Bereich von 1 und _int.MaxValue_ liegen.
+* Alle Strings müssen eine Länge zwischen 1 und 255 Zeichen haben.
+* Der Wert von _Time_ muss in der Zukunft liegen.
+
+Hinweis: Implementiere das Interface _IValidatableObject_ für die Überprüfung der Zeit.
+In der Methode _Validate_ kannst du mit _var timeProvider = validationContext.GetRequiredService<TimeProvider>()_ das Service für den Time Provider abrufen.
+Verwende _timeProvider.GetLocalNow()_, um die aktuelle Systemzeit abzurufen.
+*Verwende nicht DateTime.Now!*
+
+==== UpdateTrainingSessionMaxParticipantsCmd
+
+Füge im record _Fitnesscenter.Application/Commands/UpdateTrainingSessionMaxParticipantsCmd.cs_ Validierungen hinzu:
+
+* Alle int Werte müssen im Bereich von 1 und _int.MaxValue_ liegen.
+
+=== Implementierung des FitnessService
+
+In _Fitnesscenter.Application/Services/FitnessService.cs_ befindet sich die Klasse für das _FitnessService_.
+Implementiere die folgenden Methoden.
+
+Der Test _T01_FitnessServiceSmokeTest_ in _Lab03GradingTests_ prüft das Service.
+Arbeite erst weiter, wenn dieser Test erfolgreich durchläuft.
+
+==== Task<TrainingSession> UpdateTrainingSession(UpdateTrainingSessionCmd cmd)
+
+Diese Methode aktualisiert eine Trainingsession.
+Dabei sollen folgende Bedingungen geprüft werden:
+
+* Wird die Training Session nicht gefunden, wird mit _throw new FitnessServiceNotFoundException("Training session not found.")_ eine Exception geworfen.
+* Stimmt die Version des Command Objects nicht mit der gespeicherten Version überein, wird mit _throw new FitnessServiceException("The training session has already changed.")_ eine Exception geworfen.
+* Wird der Trainer oder der Raum, der der Session zugeordnet werden soll, nicht gefunden, wird mit 
+_throw new FitnessServiceException("Trainer not found.")_ bzw. mit
+_throw new FitnessServiceException("Room not found.")_ eine Exception geworfen.
+
+Werden alle Bedingungen erfüllt, wird die Training Session aktualisiert.
+Vergiss nicht, die Version mit _timeProvider.GetTimestamp()_ zu aktualisieren.
+
+==== Task<TrainingSession> UpdateTrainingSessionMaxParticipants(UpdateTrainingSessionMaxParticipantsCmd cmd)
+
+Diese Methode aktualisiert den Wert _TrainingSession.MaxParticipants_.
+
+* Wird die Training Session nicht gefunden, wird mit _throw new FitnessServiceNotFoundException("Training session not found")_ eine Exception geworfen.
+* Wenn mehr Teilnehmer als der neue Wert in _MaxParticipants_ vorhanden sind (Prüfe die Anzahl der Participations), wird mit
+_throw new FitnessServiceException("The number of participants exceeds the new maximum.")_ eine Exception geworfen.
+
+Werden alle Bedingungen erfüllt, wird die Training Session aktualisiert.
+Vergiss nicht, die Version mit _timeProvider.GetTimestamp()_ zu aktualisieren.
+
+==== Task DeleteTrainingSession(int id, bool forceDelete)
+
+Diese Methode löscht eine Trainingsession.
+
+* Wird die Training Session nicht gefunden, wird mit _throw new FitnessServiceNotFoundException("Training session not found")_ eine Exception geworfen.
+* Existieren Anmeldungen für die Trainingsession (Participations), wird auf den Parameter _forceDelete_ geachtet.
+  Ist der Parameter _true_, werden auch die Anmeldungen gelöscht.
+  Ist der Parameter _false_, ist ein Löschen nur möglich, wenn keine Anmeldungen vorhanden sind.
+
+Hinweis: Du kannst mit _db.Participations.Where(...).ExecuteDeleteAsync()_ bestimmte Datensätze in _Participations_ löschen.
+Selbes gilt für _db.TrainingSessions_.
+
+=== Erstellung des Interfaces
+
+Erstelle das Interface _IFitnessService_ im Namespace Services.
+Dieses Interface beinhaltet alle öffentlichen Methoden und Properties der Klasse _FitnessService_.
+Das Service implementiert natürlich dieses Interface.
+
+=== Erstellen der Endpunkte
+
+Registriere nun das Service für ASP.NET Core als _Scoped Service_.
+Der _TimeProvider_ ist bereits registriert, du kannst dieses Service mit _GetRequiredService()_ abrufen.
+
+Erstelle danach einen Controller, der auf folgende Requests reagiert.
+Der Controller soll über Dependency Injection das Interface _IFitnessService_ verwenden.
+Verwende einen primary constructor (C# 12).
+Der Controller darf nicht direkt auf den Datenbankcontext zugreifen.
+
+==== PUT /api/trainingsessions/{id}
+
+Aktualisiert eine Trainingsession über die Servicemethode _UpdateTrainingSession_.
+Achte darauf, dass im Falle einer _FitnessServiceNotFoundException_ HTTP 404 (not found) mit der Fehlermeldung als Problem Detail geliefert wird.
+Bei einer _FitnessServiceException_ wird HTTP 400 (bad request) mit der Fehlermeldung als Problem Detail geliefert wird.
+Im Erfolgsfall wird HTTP 204 (no content) geliefert.
+
+==== PATCH /api/trainingsessions/{id}/maxParticipants
+
+Aktualisiert die maximalen Teilnehmer der Trainingsession über die Servicemethode _UpdateTrainingSessionMaxParticipants_.
+Achte darauf, dass im Falle einer _FitnessServiceNotFoundException_ HTTP 404 (not found) mit der Fehlermeldung als Problem Detail geliefert wird.
+Bei einer _FitnessServiceException_ wird HTTP 400 (bad request) mit der Fehlermeldung als Problem Detail geliefert wird.
+Im Erfolgsfall wird HTTP 204 (no content) geliefert.
+
+==== DELETE /api/trainingsessions/{id}?forceDelete=(true|false)
+
+Löscht die Trainingsession über die Servicemethode _DeleteTrainingSession_.
+Achte darauf, dass im Falle einer _FitnessServiceNotFoundException_ HTTP 404 (not found) mit der Fehlermeldung als Problem Detail geliefert wird.
+Bei einer _FitnessServiceException_ wird HTTP 400 (bad request) mit der Fehlermeldung als Problem Detail geliefert wird.
+Im Erfolgsfall wird HTTP 204 (no content) geliefert.
+
+=== HTTP File und Durchführen der Tests
+
+In der Klasse _Fitnesscenter.Test/Lab03GradingTests.cs_ befinden sich Integration Tests für alle Controller.
+Alle Tests müssen erfolgreich durchlaufen.
+
+Um die Applikation schrittweise zu testen, erstelle die Datei _Fitnesscenter.Api/Fitnesscenter.Api.http_.
+Sie hat folgenden Inhalt:
+
+----
+@baseUrl = http://localhost:5080
+
+# Expected: 204 no content for the first time.
+# Subsequent requests should return "The training session has already changed."
+# because the version has changed.
+PUT {{baseUrl}}/api/trainingsessions/1
+Content-Type: application/json
+{
+    "id": 1,
+    "trainerId": 3,
+    "roomId": 1,
+    "time": "2036-06-01T13:00:00",
+    "type": "Yoga",
+    "durationMinutes": 20,
+    "maxParticipants": 40,
+    "version": 0
+}
+
+###
+
+# Expected: 204 no content.
+PATCH {{baseUrl}}/api/trainingsessions/2/maxParticipants
+Content-Type: application/json
+{
+    "id": 2,
+    "maxParticipants": 10
+}
+
+###
+
+# Expected: 204 no content. "The number of participants exceeds the new maximum."
+PATCH {{baseUrl}}/api/trainingsessions/15/maxParticipants
+Content-Type: application/json
+{
+    "id": 15,
+    "maxParticipants": 1
+}
+
+###
+
+# Expected: 204 no content.
+# Subsequent requests should return 404 not found.
+DELETE {{baseUrl}}/api/trainingsessions/16
+
+###
+
+# Expected: 204 no content.
+# Subsequent requests should return 404 not found.
+DELETE {{baseUrl}}/api/trainingsessions/15?forceDelete=true
+
+###
+
+# Expected: 400 bad request. "Training session has participations."
+DELETE {{baseUrl}}/api/trainingsessions/14
+----
