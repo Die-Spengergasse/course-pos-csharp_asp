@@ -6,6 +6,17 @@ using System.Security.Cryptography;
 
 namespace IdHasher;
 
+/// <summary>
+/// Data type for storing an encoded ID.
+/// This ensures that int id values from the database are output via the API.
+/// The secret is set globally in Program.cs:
+/// Id.Secret = Convert.FromBase64String(
+///     builder.Configuration["IdEncoderSecret"] ?? throw new Exception("Missing IdEncoderSecret."));
+/// See GuestsController for examples.
+/// 
+/// To use the type Id as routing parameter, we have to implement IParsable<T>.
+/// If the Id value is invalid (incorrect hash), ASP will automatically reject the value.
+/// </summary>
 public readonly struct Id : IParsable<Id>, IEquatable<Id>
 {
     public static byte[] Secret;

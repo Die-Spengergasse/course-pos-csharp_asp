@@ -9,6 +9,10 @@ using System.Threading.Tasks;
 
 namespace Eventmanager.Api.Controllers;
 
+/// <summary>
+/// Controller for the POST chapter including service injection.
+/// </summary>
+/// <param name="eventService"></param>
 [Route("api/[controller]")]
 [ApiController]
 public class ContingentsController(IEventService eventService) : ControllerBase

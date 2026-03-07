@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 
 namespace Eventmanager.Api.Controllers;
 
+/// <summary>
+/// Controller for the GET chapter.
+/// </summary>
 [Route("api/[controller]")]
 [ApiController]
 public class EventsController(EventContext db) : ControllerBase

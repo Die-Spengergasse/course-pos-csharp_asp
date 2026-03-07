@@ -5,6 +5,13 @@ using System.Text.Json.Serialization;
 
 namespace IdHasher;
 
+/// <summary>
+/// JSON converter to write the string value of an int id encoded with the type Id.
+/// When reading, the value is converted back to an int and the hash value is checked.
+/// It is registered global with
+/// builder.Services.AddControllers().AddJsonOptions(opt => 
+///     opt.JsonSerializerOptions.Converters.Add(new IdConverter()));
+/// </summary>
 public class IdConverter : JsonConverter<Id>
 {
     public override Id Read(

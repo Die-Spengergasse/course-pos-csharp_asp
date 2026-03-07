@@ -1,6 +1,4 @@
 ﻿namespace Hypermedia;
 
-public record HypermediaLink(
-    string Href,
-    string Method);
+public record HypermediaLink(string Href, string Method);
 

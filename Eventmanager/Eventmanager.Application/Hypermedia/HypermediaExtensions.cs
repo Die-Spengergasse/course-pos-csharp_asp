@@ -1,5 +1,8 @@
 ﻿namespace Hypermedia;
-
+/// <summary>
+/// Extension methods to add hypermedia links to a DTO class
+/// derived from HypermediaDto in LINQ queries.
+/// </summary>
 public static class HypermediaExtensions
 {
     public static T AddSelf<T>(this T dto, string url) where T : HypermediaDto

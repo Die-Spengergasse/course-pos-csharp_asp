@@ -1,0 +1,1666 @@
+= Listing of Eventmanager, created: 2026-03-07T19:56:03Z
+:source-highlighter: rouge
+
+
+== Eventmanager\Eventmanager.Api\appsettings.Development.json
+
+[source,json]
+----------
+{
+  "IdEncoderSecret": "b3JpZ2luYWxzY2FsZXdvbmxlYXZlZ2FtZWJhYnlteWFibGVleHByZXNzY2hhcmFjdGU="
+}
+----------
+
+== Eventmanager\Eventmanager.Api\appsettings.json
+
+[source,json]
+----------
+{
+  "ConnectionStrings": {
+    "Default": "DataSource=events.db"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+
+----------
+
+== Eventmanager\Eventmanager.Api\appsettings.Testing.json
+
+[source,json]
+----------
+{
+  "IdEncoderSecret": "b3JpZ2luYWxzY2FsZXdvbmxlYXZlZ2FtZWJhYnlteWFibGVleHByZXNzY2hhcmFjdGU="
+}
+----------
+
+== Eventmanager\Eventmanager.Api\Program.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Model;
+using Eventmanager.Application.Services;
+using Eventmanager.Infrastructure;
+using IdHasher;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System;
+public class Program
+{
+    private static void Main(string[] args)
+    {
+        // STEP 1: Configuring ASP.NET Core Services
+        var builder = WebApplication.CreateBuilder(args);
+        builder.Services.AddOpenApi();
+        builder.Services.AddControllers()
+            .AddJsonOptions(opt => opt.JsonSerializerOptions.Converters.Add(new IdConverter()));
+
+        // Configure Datebase with settings from appsettings.json (section ConnectionStrings)
+        //builder.Services.AddDbContext<EventContext>(options =>
+        //    options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+        builder.Services.AddDbContextFactory<EventContext>(options =>
+            options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+
+        builder.Services.AddSingleton<TimeProvider>((provider) => TimeProvider.System);
+
+        builder.Services.AddScoped<IEventService, EventService>((provider) => new EventService(
+            db: provider.GetRequiredService<EventContext>(),
+            timeProvider: provider.GetRequiredService<TimeProvider>(),
+            isDevelopment: builder.Environment.IsDevelopment()));
+
+        Id.Secret = Convert.FromBase64String(
+            builder.Configuration["IdEncoderSecret"] ?? throw new Exception("Missing IdEncoderSecret."));
+
+        builder.Services.AddGraphQLServer()
+                    .AddQueryType<Eventmanager.Application.GraphQL.Query>()
+                    .AddType<Entity>()
+                    .AddProjections()
+                    .AddFiltering()
+                    .AddSorting()
+                    .RegisterDbContextFactory<EventContext>();
+
+        // STEP 2: Configuring ASP.NET Core request pipeline
+        var app = builder.Build();
+        if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
+        {
+            // Map http://localhost:5080/openapi/v1.json
+            app.MapOpenApi();
+            app.UseSwaggerUI(options =>
+            {
+                options.SwaggerEndpoint("/openapi/v1.json", "API v1");
+            });
+            using (var scope = app.Services.CreateScope())
+            using (var service = scope.ServiceProvider.GetRequiredService<EventContext>())
+            {
+                service.Database.EnsureDeleted();
+                service.Database.EnsureCreated();
+                if (app.Environment.IsDevelopment()) service.Seed();
+            }
+        }
+        // Assign controllers to routes.
+        app.MapControllers();
+        app.MapGraphQL();         // http://localhost:5080/graphql
+        app.Run();
+    }
+}
+
+
+----------
+
+== Eventmanager\Eventmanager.Test\ContingentsControllerTests.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Dtos;
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using Microsoft.Extensions.Time.Testing;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Test;
+
+public class ContingentsControllerTests : IDisposable
+{
+    private readonly TestWebApplicationFactory<EventContext> _factory;
+    private readonly TimeProvider _timeProvider;
+    public ContingentsControllerTests()
+    {
+        _timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 2, 28, 16, 30, 0, TimeSpan.Zero));
+        _factory = new TestWebApplicationFactory<EventContext>(_timeProvider);
+    }
+    /// <summary>
+    /// Creates global test data for all unit tests.
+    /// </summary>
+    private void GenerateFixtures()
+    {
+        _factory.InitializeDatabase(db =>
+        {
+            var @event = new Event("Event1");
+            var show = new Show(@event, new DateTime(2026, 3, 7, 14, 0, 0, DateTimeKind.Utc));
+            var contingent = new Contingent(show, ContingentType.Rang, 10);
+            db.AddRange(show, contingent);
+            db.SaveChanges();
+        });
+    }
+    /// <summary>
+    /// Checks whether GET /api/contingents/{id} returns HTTP 200 and a ContingentDto.
+    /// </summary>
+    [Fact]
+    public async Task GetContingentByIdReturns200WithDataTest()
+    {
+        GenerateFixtures();
+        var (response, contingent) = await _factory.GetHttpContent<ContingentDto>("/api/contingents/1");
+        Assert.Equal(200, (int)response.StatusCode);
+        Assert.NotNull(contingent);
+        Assert.True(contingent.Id != default);
+    }
+    /// <summary>
+    /// Checks whether POST /api/contingents returns HTTP 201 with ID and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task CreateContingentReturns201Test()
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PostHttpContent(
+            "/api/contingents",
+            new CreateContingentCmd(1, "Floor", 10));
+        Assert.Equal(201, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.First(c => c.Id == 2));
+        Assert.True(contingentFromDb.Id != default);
+        Assert.True(content.GetProperty("id").GetInt32() != default);
+    }
+    /// <summary>
+    /// Checks whether PUT /api/contingents/{id} returns HTTP 204 and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task UpdateContingentReturns204Test()
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PutHttpContent(
+            "/api/contingents/1",
+            new UpdateContingentCmd(1, 1, "Floor", 10, 0));
+        Assert.Equal(204, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.First(c => c.Id == 1));
+        Assert.True(contingentFromDb.ContingentType == ContingentType.Floor);
+    }
+    /// <summary>
+    /// Checks whether DELETE /api/contingents/{id} returns HTTP 204 and modifies the database.
+    /// </summary>
+    [Fact]
+    public async Task DeleteContingentReturns204Test()
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.DeleteHttpContent("/api/contingents/1");
+        Assert.Equal(204, (int)response.StatusCode);
+        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.FirstOrDefault(c => c.Id == 1));
+        Assert.Null(contingentFromDb);
+    }
+    /// <summary>
+    /// Checks whether POST /api/contingents returns HTTP 400 with the corresponding error message in the problem detail.
+    /// </summary>
+    [Theory]
+    [InlineData("xxx", 1, "invalid value for contingent type")]
+    [InlineData("Floor", 999, "show 999 not found")]
+    [InlineData("Rang", 1, "show has already a contingent for")]
+    public async Task CreateContingentReturns400WithProblemDetailTest(string contingentType, int showId, string errorMessage)
+    {
+        GenerateFixtures();
+        var (response, content) = await _factory.PostHttpContent(
+            "/api/contingents",
+            new CreateContingentCmd(showId, contingentType, 10));
+        Assert.Equal(400, (int)response.StatusCode);
+        Assert.True(_factory.ContentContainsErrorMessage(content, errorMessage));
+    }
+    public void Dispose()
+    {
+        _factory.Dispose();
+    }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Test\TestWebApplicationFactory.cs
+
+[source,csharp]
+----------
+using HotChocolate.Execution;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Test;
+
+/// <summary>
+/// Helperklasse für Integrationtests.
+/// Usage (with time provider from Microsoft.Extensions.TimeProvider.Testing):
+///     _timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 2, 28, 16, 30, 0, TimeSpan.Zero));
+///     _factory = new TestWebApplicationFactory<EventContext>(_timeProvider);
+/// Usage without time Provider
+///     _factory = new TestWebApplicationFactory<EventContext>();
+/// </summary>
+public class TestWebApplicationFactory<Tcontext> : WebApplicationFactory<Program> where Tcontext : DbContext
+{
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+    private readonly TimeProvider? _timeProvider;
+
+    public TestWebApplicationFactory(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider;
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureServices(services =>
+        {
+            var descriptor = services.First(d => d.ServiceType == typeof(DbContextOptions<Tcontext>));
+            services.Remove(descriptor);
+            services.AddDbContext<Tcontext>(options =>
+            {
+                options.UseSqlite("DataSource=api_test.db");
+            });
+            var timeProvider = services.FirstOrDefault(d => d.ServiceType == typeof(TimeProvider));
+            if (timeProvider is not null && _timeProvider is not null)
+            {
+                services.Remove(timeProvider);
+                services.AddSingleton<TimeProvider>(opt => _timeProvider);
+            }
+        });
+        // To avoid seeding the database used in development mode.
+        builder.UseEnvironment("Testing");
+    }
+    public void InitializeDatabase(Action<Tcontext> action)
+    {
+        using var scope = Services.CreateScope();
+        using var db = scope.ServiceProvider.GetRequiredService<Tcontext>();
+        db.Database.EnsureDeleted();
+        db.Database.EnsureCreated();
+        action(db);
+    }
+    public Tout QueryDatabase<Tout>(Func<Tcontext, Tout> query)
+    {
+        using var scope = Services.CreateScope();
+        using var db = scope.ServiceProvider.GetRequiredService<Tcontext>();
+        return query(db);
+    }
+    /// <summary>
+    /// Send a GET Request and return the deserialized response.
+    /// Useful for strongly typed JSON data with DTOs.
+    /// </summary>
+    public async Task<(HttpResponseMessage, T?)> GetHttpContent<T>(string requestUrl) where T : class
+    {
+        using var client = CreateClient();
+        var response = await client.GetAsync(requestUrl);
+        if (!response.IsSuccessStatusCode) return (response, default);
+        var dataString = await response.Content.ReadAsStringAsync();
+        var data = JsonSerializer.Deserialize<T>(dataString, _jsonOptions);
+        if (data is null) throw new Exception("Deserialization failed");
+        return (response, data);
+    }
+
+    /// <summary>
+    /// Send a GET Request and return the response as a JsonElement. Useful for dynamic JSON data without DTOs.
+    /// </summary>
+    /// <param name="requestUrl"></param>
+    /// <returns></returns>
+    public async Task<(HttpResponseMessage, JsonElement)> GetHttpContent(string requestUrl)
+    {
+        using var client = CreateClient();
+        var response = await client.GetAsync(requestUrl);
+        if (!response.IsSuccessStatusCode) return (response, new JsonElement());
+        var dataString = await response.Content.ReadAsStringAsync();
+        var data = JsonDocument.Parse(dataString);
+        return (response, data.RootElement);
+    }
+
+    /// <summary>
+    /// Send a POST Request with a strongly typed payload and return the deserialized response.
+    /// </summary>
+    public async Task<(HttpResponseMessage, JsonElement)> PostHttpContent<Tcmd>(string requestUrl, Tcmd payload) where Tcmd : class
+    {
+        using var client = CreateClient();
+        var jsonBody = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await client.PostAsync(requestUrl, jsonBody);
+        var dataString = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrEmpty(dataString)) return (response, new JsonElement());
+        var data = JsonDocument.Parse(dataString);
+        return (response, data.RootElement);
+    }
+
+    /// <summary>
+    /// Send a PATCH Request with a strongly typed payload and return the deserialized response.
+    /// </summary>
+    public async Task<(HttpResponseMessage, JsonElement)> PatchHttpContent<Tcmd>(string requestUrl, Tcmd payload) where Tcmd : class
+    {
+        using var client = CreateClient();
+        var jsonBody = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await client.PatchAsync(requestUrl, jsonBody);
+        var dataString = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrEmpty(dataString)) return (response, new JsonElement());
+        var data = JsonDocument.Parse(dataString);
+        return (response, data.RootElement);
+    }
+
+    /// <summary>
+    /// Send a PUT Request with a strongly typed payload and return the deserialized response.
+    /// </summary>
+    public async Task<(HttpResponseMessage, JsonElement)> PutHttpContent<Tcmd>(string requestUrl, Tcmd payload) where Tcmd : class
+    {
+        using var client = CreateClient();
+        var jsonBody = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var response = await client.PutAsync(requestUrl, jsonBody);
+        var dataString = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrEmpty(dataString)) return (response, new JsonElement());
+        var data = JsonDocument.Parse(dataString);
+        return (response, data.RootElement);
+    }
+
+    /// <summary>
+    /// Send a DELETE Request with a strongly typed payload and return the deserialized response.
+    /// </summary>
+    public async Task<(HttpResponseMessage, JsonElement)> DeleteHttpContent(string requestUrl)
+    {
+        using var client = CreateClient();
+        var response = await client.DeleteAsync(requestUrl);
+        var dataString = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrEmpty(dataString)) return (response, new JsonElement());
+        var data = JsonDocument.Parse(dataString);
+        return (response, data.RootElement);
+    }
+    /// <summary>
+    /// Liest einen rfc problem detail aus. Dieser kann aus 2 Arten bestehen:
+    /// { "detail": "Error message" } bei Servicefehlern
+    /// { "errors": "MyProperty": ["Validation message" ] } bei Validierungsfehlern
+    /// </summary>
+    /// <param name="content"></param>
+    /// <returns></returns>
+    public bool ContentContainsErrorMessage(JsonElement content, string message) =>
+        content.TryGetProperty("errors", out var errors)
+        ? errors.EnumerateObject()
+            .Any(obj => obj.Value.EnumerateArray()
+                .Any(item => item.GetString()?.Contains(message, StringComparison.OrdinalIgnoreCase) == true))
+        : content.TryGetProperty("detail", out var detail)
+            ? detail.GetString()?.Contains(message, StringComparison.OrdinalIgnoreCase) == true
+            : false;
+    public HttpClient Client => CreateClient();
+}
+
+----------
+
+== Eventmanager\Eventmanager.Api\Controllers\ContingentsController.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Dtos;
+using Eventmanager.Application.Services;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Api.Controllers;
+
+/// <summary>
+/// Controller for the POST chapter including service injection.
+/// </summary>
+/// <param name="eventService"></param>
+[Route("api/[controller]")]
+[ApiController]
+public class ContingentsController(IEventService eventService) : ControllerBase
+{
+    [HttpGet("{id}")]
+    [ProducesResponseType<ContingentDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ContingentDto>> GetContingentById(int id)
+    {
+        var contingent = await eventService.Contingents
+            .Where(c => c.Id == id)
+            .Select(c => new ContingentDto(
+                c.Id, c.Show.Id, c.Show.Date,
+                c.Show.Event.Name, c.ContingentType.ToString(), c.AvailableTickets))
+            .FirstOrDefaultAsync();
+        if (contingent is null) return Problem("Contingent not found.", statusCode: 404);
+        return Ok(contingent);
+    }
+
+    [HttpPost]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateContingent([FromBody] CreateContingentCmd cmd)
+    {
+        try
+        {
+            var contingent = await eventService.CreateContingent(cmd);
+            // Return 201 created and set the location header to the uri of the created resource (/api/contingents/{id})
+            return CreatedAtAction(
+                nameof(GetContingentById),      // Name of GET Method to retrieve the resource.
+                new { id = contingent.Id },     // Routing parameter (id)
+                new { id = contingent.Id });    // Created resource.
+        }
+        catch (EventServiceException e)
+        {
+            return Problem(e.Message, statusCode: 400);
+        }
+    }
+
+    [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateContingent([FromRoute] int id, [FromBody] UpdateContingentCmd cmd)
+    {
+        if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
+        try
+        {
+            await eventService.UpdateContingent(cmd);
+            return NoContent();
+        }
+        catch (EventServiceNotFoundException e)
+        {
+            return Problem(e.Message, statusCode: 404);
+        }
+        catch (EventServiceException e)
+        {
+            return Problem(e.Message, statusCode: 400);
+        }
+    }
+
+    [HttpPatch("{id}/availableTickets")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAvailableTickets([FromRoute] int id, [FromBody] UpdateContingentAvailableTicketsCmd cmd)
+    {
+        if (id != cmd.Id) return Problem("Invalid id.", statusCode: 400);
+        try
+        {
+            await eventService.UpdateAvailableTickets(cmd);
+            return NoContent();
+        }
+        catch (EventServiceNotFoundException e)
+        {
+            return Problem(e.Message, statusCode: 404);
+        }
+        catch (EventServiceException e)
+        {
+            return Problem(e.Message, statusCode: 400);
+        }
+    }
+
+    [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteContingents([FromRoute] int id)
+    {
+        try
+        {
+            await eventService.DeleteContingent(id);
+            return NoContent();
+        }
+        catch (EventServiceNotFoundException e)
+        {
+            return Problem(e.Message, statusCode: 404);
+        }
+        catch (EventServiceException e)
+        {
+            return Problem(e.Message, statusCode: 400);
+        }
+    }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Api\Controllers\EventsController.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Dtos;
+using Eventmanager.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Api.Controllers;
+
+/// <summary>
+/// Controller for the GET chapter.
+/// </summary>
+[Route("api/[controller]")]
+[ApiController]
+public class EventsController(EventContext db) : ControllerBase
+{
+    [HttpGet]
+    [ProducesResponseType<List<EventDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<EventDto>>> GetAllEvents()
+    {
+        var events = await db.Events
+            .Select(e => new EventDto(e.Id, e.Name, e.Shows.Count))
+            .ToListAsync();
+        return Ok(events);
+    }
+
+    [HttpGet("{id}")]
+    [ProducesResponseType<EventDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<EventDto>> GetEventById(
+        [FromRoute] int id,
+        [FromQuery] bool includeShows = false)
+    {
+        var eventData = await db.Events
+            .Where(e => e.Id == id)
+            .Select(e => new EventWithShowsDto(
+                e.Id, e.Name,
+                includeShows
+                    ? e.Shows.Select(s => new ShowDto(s.Id, s.Date)).ToList()
+                    : new List<ShowDto>()))
+            .FirstOrDefaultAsync();
+        if (eventData is null) return Problem("Event not found", statusCode: 404);
+        return Ok(eventData);
+    }
+}
+
+
+----------
+
+== Eventmanager\Eventmanager.Api\Controllers\GuestsController.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Dtos;
+using Eventmanager.Infrastructure;
+using Hypermedia;
+using IdHasher;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Api.Controllers;
+
+/// <summary>
+/// Controller to demonstrate the IdEncoder and hypermedia links.
+/// </summary>
+[Route("api/[controller]")]
+[ApiController]
+public class GuestsController(EventContext db) : ControllerBase   // Primary constructor in C# 12
+{
+    [HttpGet]
+    [ProducesResponseType<List<GuestDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<GuestDto>>> GetGuests(CancellationToken cancellationToken)
+    {
+        // Remember: Add "use Hypermedia". The AddGet, AddDelete, etc. methods are not available without it.
+        // First, query the database to retrieve all the necessary information to prevent client site evaluation.
+        // Then, add hypermedia links.
+        var guests = (
+                await db.Guests
+                    .Select(g => new { Guest = g, CanDelete = !g.Tickets.Any() })
+                    .ToListAsync(cancellationToken)
+            ).Select(g => new GuestDto(
+                    Id.From(g.Guest.Id), g.Guest.Firstname, g.Guest.Lastname, g.Guest.BirthDate)
+                .AddGet(GenerateResourceLink(Id.From(g.Guest.Id)), "details")
+                .AddDelete(GenerateResourceLink(Id.From(g.Guest.Id)), "delete", g.CanDelete))
+            .ToList();
+        return Ok(guests);
+    }
+
+    [HttpGet("{id}")]
+    [ProducesResponseType<GuestDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<GuestDto>> GetGuestById([FromRoute] Id id)
+    {
+        var guest = await db.Guests
+            .Where(g => g.Id == id.Value)
+            .Select(g => new GuestDto(new Id(g.Id), g.Firstname, g.Lastname, g.BirthDate))
+            .FirstOrDefaultAsync();
+
+        if (guest is null) return Problem("Guest not found.", statusCode: 404);
+        return Ok(guest);
+    }
+
+    [HttpPost]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    public async Task<IActionResult> CreateGuest() => throw new NotImplementedException();
+
+    [HttpPatch("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateGuest(Id id) => throw new NotImplementedException();
+
+    [HttpDelete("{id}", Name = nameof(DeleteGuest))]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteGuest(Id id) => throw new NotImplementedException();
+
+    private string GenerateResourceLink(Id id) =>
+        Url.ActionLink(action: nameof(GetGuestById), values: new { id = id }) ?? string.Empty;
+}
+
+----------
+
+== Eventmanager\Eventmanager.Api\Properties\launchSettings.json
+
+[source,json]
+----------
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "graphql",
+      "applicationUrl": "http://localhost:5080",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\Commands\CreateContingentCmd.cs
+
+[source,csharp]
+----------
+using Eventmanager.Model;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
+namespace Eventmanager.Application.Commands;
+
+public record CreateContingentCmd(
+    [Range(1,int.MaxValue)]
+    int ShowId,
+    [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid contingent type.")]
+    string ContingentType,
+    [Range(1,9999)]
+    int AvailableTickets) : IValidatableObject
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!Enum.IsDefined(typeof(ContingentType), ContingentType))
+        {
+            yield return new ValidationResult(
+                "Invalid value for contingent type",
+                new string[] { nameof(ContingentType) });
+        }
+    }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\Commands\UpdateContingentAvailableTicketsCmd.cs
+
+[source,csharp]
+----------
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace Eventmanager.Application.Commands;
+
+public record UpdateContingentAvailableTicketsCmd(
+    [Range(1,9999,ErrorMessage = "Invalid id.")]
+    int Id,
+    [Range(1,9999)]
+    int AvailableTickets);
+
+----------
+
+== Eventmanager\Eventmanager.Application\Commands\UpdateContingentCmd.cs
+
+[source,csharp]
+----------
+using Eventmanager.Model;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
+namespace Eventmanager.Application.Commands;
+
+public record UpdateContingentCmd(
+    [Range(1,int.MaxValue, ErrorMessage = "Invalid id.")]
+    int Id,
+    [Range(1,int.MaxValue, ErrorMessage = "Invalid show id.")]
+    int ShowId,
+    [StringLength(255, MinimumLength = 1, ErrorMessage = "Invalid contingent type.")]
+    string ContingentType,
+    [Range(1,9999)]
+    int AvailableTickets,
+    long Version) : IValidatableObject
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!Enum.IsDefined(typeof(ContingentType), ContingentType))
+        {
+            yield return new ValidationResult(
+                "Invalid value for contingent type",
+                new string[] { nameof(ContingentType) });
+        }
+    }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\Dtos\ContingentDto.cs
+
+[source,csharp]
+----------
+using System;
+
+namespace Eventmanager.Application.Dtos;
+
+public record ContingentDto(
+    int Id, int ShowId, DateTime ShowDate, string EventName,
+    string ContingentType, int AvailableTickets);
+----------
+
+== Eventmanager\Eventmanager.Application\Dtos\EventDto.cs
+
+[source,csharp]
+----------
+namespace Eventmanager.Application.Dtos;
+
+public record EventDto(int Id, string Name, int ShowsCount);
+
+----------
+
+== Eventmanager\Eventmanager.Application\Dtos\EventWithShowsDto.cs
+
+[source,csharp]
+----------
+using System.Collections.Generic;
+
+namespace Eventmanager.Application.Dtos;
+
+public record EventWithShowsDto(int Id, string Name, List<ShowDto> Shows);
+
+
+----------
+
+== Eventmanager\Eventmanager.Application\Dtos\GuestDto.cs
+
+[source,csharp]
+----------
+using Hypermedia;
+using IdHasher;
+using System;
+namespace Eventmanager.Application.Dtos;
+
+public record GuestDto(
+    Id Id,
+    string Firstname, string Lastname, DateOnly BirthDate) : HypermediaDto;
+
+----------
+
+== Eventmanager\Eventmanager.Application\Dtos\ShowDto.cs
+
+[source,csharp]
+----------
+using System;
+
+namespace Eventmanager.Application.Dtos;
+
+public record ShowDto(int Id, DateTime Date);
+
+----------
+
+== Eventmanager\Eventmanager.Application\GraphQL\Query.cs
+
+[source,csharp]
+----------
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using HotChocolate.Data;
+using System.Linq;
+
+namespace Eventmanager.Application.GraphQL;
+
+/// <summary>
+/// Registierung aller Entities für GraphQL.
+/// Wird in Program.cs mit builder.Services.AddGraphQLServer()....AddType<Entity>() verwendet.
+/// [UseProjection] ensures that GraphQL queries are translated into SQL SELECTs.
+/// [UseFiltering] allows the client to filter data (e.g., by name).
+/// [UseSorting] allows the client to sort the results.
+/// 
+/// Requires HotChocolate.Data.EntityFramework
+/// </summary>
+public class Query
+{
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Event> GetEvents(EventContext db)
+        => db.Events;
+
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Show> GetShows(EventContext db)
+        => db.Shows;
+
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Guest> GetGuests(EventContext db)
+        => db.Guests;
+
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Contingent> GetContingents(EventContext db)
+        => db.Contingents;
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\GraphQL\UseHashedIdAttribute.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Model;
+using HotChocolate.Types;
+using HotChocolate.Types.Descriptors;
+using IdHasher;
+using System.Reflection;
+
+namespace Eventmanager.Application.GraphQL;
+
+/// <summary>
+/// Converter to translate the Entity.Id property into an encoded ID value using the ID converter.
+/// </summary>
+public class UseHashedIdAttribute : ObjectFieldDescriptorAttribute
+{
+    protected override void OnConfigure(
+        IDescriptorContext context, IObjectFieldDescriptor descriptor, MemberInfo member)
+    {
+        descriptor
+            .Type<NonNullType<StringType>>()  // int to string
+            .Resolve(ctx =>
+            {
+                var entity = ctx.Parent<Entity>();
+                return Id.From(entity.Id).EncodedValue;
+            });
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Hypermedia\HypermediaDto.cs
+
+[source,csharp]
+----------
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+namespace Hypermedia;
+
+public abstract record HypermediaDto
+{
+    private Dictionary<string, HypermediaLink> _links = new();
+
+    [JsonInclude]
+    public IReadOnlyDictionary<string, HypermediaLink> Links => _links.AsReadOnly();
+
+    // Interne oder geschützte Methode, damit die Extensions Links hinzufügen können
+    internal void AddLinkInternal(string rel, HypermediaLink link)
+    {
+        _links[rel] = link; // Nutzt den Indexer, um Abstürze bei doppelten Keys zu vermeiden
+    }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\Hypermedia\HypermediaExtensions.cs
+
+[source,csharp]
+----------
+namespace Hypermedia;
+/// <summary>
+/// Extension methods to add hypermedia links to a DTO class
+/// derived from HypermediaDto in LINQ queries.
+/// </summary>
+public static class HypermediaExtensions
+{
+    public static T AddSelf<T>(this T dto, string url) where T : HypermediaDto
+        => dto.AddGet(url, "self");
+
+    public static T AddGet<T>(this T dto, string url, string rel, bool useLink = true) where T : HypermediaDto
+        => dto.AddLink(url, rel, "GET", useLink);
+
+    public static T AddPost<T>(this T dto, string url, string rel, bool useLink = true) where T : HypermediaDto
+        => dto.AddLink(url, rel, "POST", useLink);
+
+    public static T AddPut<T>(this T dto, string url, string rel, bool useLink = true) where T : HypermediaDto
+        => dto.AddLink(url, rel, "PUT", useLink);
+
+    public static T AddPatch<T>(this T dto, string url, string rel, bool useLink = true) where T : HypermediaDto
+        => dto.AddLink(url, rel, "PATCH", useLink);
+
+    public static T AddDelete<T>(this T dto, string url, string rel, bool useLink = true) where T : HypermediaDto
+        => dto.AddLink(url, rel, "DELETE", useLink);
+
+    /// <summary>
+    /// Adds a hypermedia link.
+    /// </summary>
+    /// <param name="url">The value for href.
+    /// <param name="rel">The relationship to the resource.
+    /// <param name="method">HTTP method.
+    /// <param name="useLink">
+    /// Specifies whether the link should be used. If the value is false, the method does nothing.
+    /// Useful in LINQ queries where the link is generated with a condition.
+    /// </param>
+    public static T AddLink<T>(this T dto, string url, string rel, string method, bool useLink = true) where T : HypermediaDto
+    {
+        if (string.IsNullOrEmpty(url) || !useLink) return dto;
+
+        dto.AddLinkInternal(rel, new HypermediaLink(url, method));
+        return dto;
+    }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\Hypermedia\HypermediaLink.cs
+
+[source,csharp]
+----------
+namespace Hypermedia;
+
+public record HypermediaLink(string Href, string Method);
+
+
+----------
+
+== Eventmanager\Eventmanager.Application\IdHasher\IdConverter.cs
+
+[source,csharp]
+----------
+using System;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace IdHasher;
+
+/// <summary>
+/// JSON converter to write the string value of an int id encoded with the type Id.
+/// When reading, the value is converted back to an int and the hash value is checked.
+/// It is registered global with
+/// builder.Services.AddControllers().AddJsonOptions(opt => 
+///     opt.JsonSerializerOptions.Converters.Add(new IdConverter()));
+/// </summary>
+public class IdConverter : JsonConverter<Id>
+{
+    public override Id Read(
+        ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.HasValueSequence)
+            return Id.Decode(reader.GetString() ?? string.Empty);
+
+        Span<char> chars = stackalloc char[reader.ValueSpan.Length];
+        int written = Encoding.UTF8.GetChars(reader.ValueSpan, chars);
+        return Id.Decode(chars[..written]);
+    }
+
+    public override void Write(Utf8JsonWriter writer, Id id, JsonSerializerOptions options) =>
+        writer.WriteStringValue(id.EncodedValue);
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\IdHasher\IdEncoder.cs
+
+[source,csharp]
+----------
+using System;
+using System.Buffers.Binary;
+using System.Buffers.Text;
+using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
+
+namespace IdHasher;
+
+/// <summary>
+/// Data type for storing an encoded ID.
+/// This ensures that int id values from the database are output via the API.
+/// The secret is set globally in Program.cs:
+/// Id.Secret = Convert.FromBase64String(
+///     builder.Configuration["IdEncoderSecret"] ?? throw new Exception("Missing IdEncoderSecret."));
+/// See GuestsController for examples.
+/// 
+/// To use the type Id as routing parameter, we have to implement IParsable<T>.
+/// If the Id value is invalid (incorrect hash), ASP will automatically reject the value.
+/// </summary>
+public readonly struct Id : IParsable<Id>, IEquatable<Id>
+{
+    public static byte[] Secret;
+    private const int _strLen = 48;  // 44 Bytes Hash (SHA256 with Base64) + 4 Bytes ID
+    public static Id Empty => new Id(0);
+    /// <summary>
+    /// Assign a random secret. Only used if no secret is set.
+    /// Important: Set a fixed secred with id.Secret to produce same results for same keys after a restart.
+    /// </summary>
+    static Id()
+    {
+        Secret = new byte[32];
+        RandomNumberGenerator.Fill(Secret);
+    }
+    public static Id From(int id) => new Id(id);
+    public int Value { get; }
+    public Id(int value)
+    {
+        Value = value;
+    }
+    public bool HasValue => Value != 0;
+    /// <summary>
+    /// Encodes the value with HMACSHA256.
+    /// The encoder writes the original integer value to the first four bytes of the array.
+    /// The hash value is written after these four bytes.
+    /// Array: V V V V H H H H ... H H (V: value, H: hash)    
+    /// </summary>
+    public string EncodedValue
+    {
+        get
+        {
+            return string.Create(_strLen, Value, (chars, val) =>
+            {
+
+                Span<byte> buffer = stackalloc byte[36]; // 4 (int) + 32 (hash)
+                BinaryPrimitives.WriteInt32LittleEndian(buffer, val);
+                HMACSHA256.HashData(Secret, buffer[..4], buffer[4..]);
+                Base64Url.EncodeToChars(buffer, chars);
+            });
+        }
+    }
+    /// <summary>
+    /// Check the hash value and return an instance of Id with the decoded value.
+    /// If decoding fails, the value of the instance is 0.
+    /// </summary>
+    public static Id Decode(ReadOnlySpan<char> encodedValue)
+    {
+        if (encodedValue.Length != _strLen) return default;
+
+        Span<byte> buffer = stackalloc byte[36];
+        if (Base64Url.DecodeFromChars(encodedValue, buffer) != 36) return default;
+
+        Span<byte> computedHash = stackalloc byte[32];
+        HMACSHA256.HashData(Secret, buffer[..4], computedHash);
+
+        if (!CryptographicOperations.FixedTimeEquals(buffer[4..], computedHash))
+            return default;
+
+        return new Id(BinaryPrimitives.ReadInt32LittleEndian(buffer));
+    }
+    public static bool operator ==(Id left, Id right) => left.Value == right.Value;
+    public static bool operator !=(Id left, Id right) => left.Value != right.Value;
+    public static implicit operator int(Id id) => id.Value;
+    public static explicit operator Id(int value) => new Id(value);
+    public override string ToString() => EncodedValue;
+    public override bool Equals(object? obj) => obj is Id && Equals((Id)obj);
+    public override int GetHashCode() => Value.GetHashCode();
+    public bool Equals(Id other) => Value == other.Value;
+    /// <summary>
+    /// Converts an encoded string to an instance of Id.
+    /// If the Id cannot be decoded, the value of the result is 0.
+    /// The model binder requires parsing methods if you use the Id type together 
+    /// with [FromRoute] or [FromQuery] in your controller.
+    /// </summary>
+    public static Id Parse(string s, IFormatProvider? provider) => Decode(s);
+    /// <summary>
+    /// Converts an encoded string to an instance of Id.
+    /// If the Id cannot be decoded, the value of the result is 0.
+    /// Returns false if the string cannot be a hashed id value.
+    /// The model binder requires parsing methods if you use the Id type together 
+    /// with [FromRoute] or [FromQuery] in your controller.
+    /// </summary>
+    public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out Id result)
+    {
+        result = Decode(s);
+        return result.HasValue;
+    }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\Infrastructure\EventContext.cs
+
+[source,csharp]
+----------
+using Bogus;
+using Eventmanager.Model;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Eventmanager.Infrastructure
+{
+    public class EventContext : DbContext
+    {
+        public DbSet<Contingent> Contingents => Set<Contingent>();
+        public DbSet<Event> Events => Set<Event>();
+        public DbSet<Guest> Guests => Set<Guest>();
+        public DbSet<Show> Shows => Set<Show>();
+        public DbSet<Ticket> Tickets => Set<Ticket>();
+
+        public EventContext()
+        { }
+
+        public EventContext(DbContextOptions options) : base(options)
+        { }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            if (!optionsBuilder.IsConfigured)
+            {
+                optionsBuilder.UseSqlite(@"Data Source=event.db");
+            }
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Contingent>().Property(c => c.ContingentType).HasConversion<string>();
+            modelBuilder.Entity<Ticket>().Property(t => t.TicketState).HasConversion<string>();
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                // Generic config for all entities
+                // ON DELETE RESTRICT instead of ON DELETE CASCADE
+                foreach (var key in entityType.GetForeignKeys())
+                    key.DeleteBehavior = DeleteBehavior.Restrict;
+
+                foreach (var prop in entityType.GetDeclaredProperties())
+                {
+                    // Define Guid as alternate key. The database can create a guid fou you.
+                    if (prop.Name == "Guid")
+                    {
+                        modelBuilder.Entity(entityType.ClrType).HasAlternateKey("Guid");
+                        prop.ValueGenerated = Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.OnAdd;
+                    }
+                    // Default MaxLength of string Properties is 255.
+                    if (prop.ClrType == typeof(string) && prop.GetMaxLength() is null) prop.SetMaxLength(255);
+                    // Seconds with 3 fractional digits.
+                    if (prop.ClrType == typeof(DateTime)) prop.SetPrecision(3);
+                    if (prop.ClrType == typeof(DateTime?)) prop.SetPrecision(3);
+                }
+            }
+        }
+
+        public void Seed()
+        {
+            Randomizer.Seed = new Random(1028);
+            var minDate = new DateTime(2023, 6, 1);
+            var maxDate = new DateTime(2024, 6, 1);
+            var faker = new Faker();
+
+            var events = new Faker<Event>("de").CustomInstantiator(f => new Event(f.Music.Genre()))
+                .Generate(5)
+                .DistinctBy(e => e.Name)
+                .ToList();
+            Events.AddRange(events);
+            SaveChanges();
+
+            var shows = new Faker<Show>("de").CustomInstantiator(f =>
+            {
+                var date = f.Date.Between(minDate, maxDate).Date.AddHours(f.Random.Int(18, 20));
+                return new Show(f.Random.ListItem(events), date);
+            })
+                .Generate(25)
+                .ToList();
+            Shows.AddRange(shows);
+            SaveChanges();
+
+            var guests = new Faker<Guest>("de").CustomInstantiator(f =>
+            {
+                return new Guest(
+                    f.Name.FirstName(), f.Name.LastName(),
+                    f.Date.BetweenDateOnly(new DateOnly(2000, 1, 1), new DateOnly(2005, 1, 1)));
+            })
+            .Generate(20)
+            .ToList();
+            Guests.AddRange(guests);
+            SaveChanges();
+
+            var contingents = shows.SelectMany(s => new Contingent[] {
+                new Contingent(s, ContingentType.Floor, faker.Random.Int(3, 10)*10),
+                new Contingent(s, ContingentType.Rang, faker.Random.Int(3, 10)*10),
+                new Contingent(s, ContingentType.Stands, faker.Random.Int(3, 10)*10)})
+                .Skip(2)
+                .ToList();
+            Contingents.AddRange(contingents);
+
+            // 30% of the contingents are sold out.
+            var tickets = contingents.SelectMany(c =>
+                GenerateTickets(
+                    c, guests[2..],
+                    faker.Random.Bool(0.3f) ? c.AvailableTickets : faker.Random.Int(0, c.AvailableTickets)))
+                .ToList();
+            Tickets.AddRange(tickets);
+            SaveChanges();
+        }
+
+        private IEnumerable<Ticket> GenerateTickets(Contingent contingent, List<Guest> guests, int personCount)
+        {
+            var guestNr = 0;
+            var guestCount = guests.Count;
+            var ticketsGenerator = new Faker<Ticket>("de").CustomInstantiator(f =>
+            {
+                var ticketState = f.Random.Enum<TicketState>();
+                var reservationDate = contingent.Show.Date.AddHours(f.Random.Int(-21 * 24, -14 * 24));
+                var guest = guests[guestNr];
+                guestNr = (guestNr + 1) % guestCount;
+                return new Ticket(
+                    guest, contingent, ticketState,
+                    reservationDate, f.Random.Int(0, 2));
+            }).GenerateForever();
+            int count = 0;
+            while (count < personCount)
+            {
+                var ticket = ticketsGenerator.First();
+                if (count + ticket.Pax + 1 > personCount - 1)
+                    ticket.Pax = personCount - count - 1;
+                count += ticket.Pax + 1;
+                yield return ticket;
+            }
+        }
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Model\Contingent.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Model;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
+namespace Eventmanager.Model
+{
+    public class Contingent : Entity
+    {
+        protected Contingent() { }
+        [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+        public Contingent(Show show, ContingentType contingentType, int availableTickets)
+        {
+            Show = show;
+            ContingentType = contingentType;
+            AvailableTickets = availableTickets;
+        }
+        public required Show Show { get; set; }
+        public required ContingentType ContingentType { get; set; }
+        public required int AvailableTickets { get; set; }
+        [ConcurrencyCheck]
+        public long Version { get; set; }
+        // Setter is important for UseProjection in HotChocolate's GraphQL
+        public List<Ticket> Tickets { get; set; } = new();
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Model\ContingentType.cs
+
+[source,csharp]
+----------
+namespace Eventmanager.Model
+{
+    public enum ContingentType
+    { Floor, Stands, Rang }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Model\Entity.cs
+
+[source,csharp]
+----------
+
+using Eventmanager.Application.GraphQL;
+namespace Eventmanager.Application.Model;
+
+public abstract class Entity
+{
+    [UseHashedId]
+    public int Id { get; set; }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\Model\Event.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Model;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+namespace Eventmanager.Model
+{
+    public class Event : Entity
+    {
+        protected Event() { }
+        [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+        public Event(string name)
+        {
+            Name = name;
+        }
+        public required string Name { get; set; }
+        [JsonIgnore]
+        // Setter is important for UseProjection in HotChocolate's GraphQL
+        public List<Show> Shows { get; set; } = new();
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Model\Guest.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Model;
+using System;
+using System.Collections.Generic;
+
+namespace Eventmanager.Model
+{
+    public class Guest : Entity
+    {
+        protected Guest() { }
+        [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+        public Guest(string firstname, string lastname, DateOnly birthDate)
+        {
+            Firstname = firstname;
+            Lastname = lastname;
+            BirthDate = birthDate;
+        }
+        public required string Firstname { get; set; }
+        public required string Lastname { get; set; }
+        public required DateOnly BirthDate { get; set; }
+        // Setter is important for UseProjection in HotChocolate's GraphQL
+        public List<Ticket> Tickets { get; set; } = new();
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Model\Show.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Model;
+using System;
+using System.Collections.Generic;
+
+namespace Eventmanager.Model
+{
+    public class Show : Entity
+    {
+        protected Show() { }
+        [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+        public Show(Event @event, DateTime date)
+        {
+            Event = @event;
+            Date = date;
+        }
+        public required Event Event { get; set; }
+        public required DateTime Date { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        // Setter is important for UseProjection in HotChocolate's GraphQL
+        public List<Contingent> Contingents { get; set; } = new();
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Model\Ticket.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Model;
+using System;
+
+namespace Eventmanager.Model
+{
+    public class Ticket : Entity
+    {
+        protected Ticket() { }
+        [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+        public Ticket(Guest guest, Contingent contingent, TicketState ticketState, DateTime reservationDateTime, int pax)
+        {
+            Guest = guest;
+            Contingent = contingent;
+            TicketState = ticketState;
+            ReservationDateTime = reservationDateTime;
+            Pax = pax;
+        }
+        public required Guest Guest { get; set; }
+        public required Contingent Contingent { get; set; }
+        public required TicketState TicketState { get; set; }
+        public required DateTime ReservationDateTime { get; set; }
+        public required int Pax { get; set; }
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Model\TicketState.cs
+
+[source,csharp]
+----------
+namespace Eventmanager.Model
+{
+    public enum TicketState
+    { Reserved, Sold }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Services\EventService.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Commands;
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Application.Services;
+
+
+public class EventService(EventContext db, TimeProvider timeProvider, bool isDevelopment) : IEventService
+{
+    public IQueryable<Contingent> Contingents => db.Contingents.AsQueryable();
+    public IQueryable<Event> Events => db.Events.AsQueryable();
+    public IQueryable<Show> Shows => db.Shows.AsQueryable();
+
+    public async Task<Contingent> CreateContingent(CreateContingentCmd cmd)
+    {
+        if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
+            throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
+
+        var show = await db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
+            ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
+
+        if (await db.Contingents.AnyAsync(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
+            throw new EventServiceException($"Show has already a contingent for {cmd.ContingentType}.");
+
+        var contingent = new Contingent(show, contingentType, cmd.AvailableTickets);
+        db.Add(contingent);
+        await SaveChanges();
+        return contingent;
+    }
+
+    public async Task UpdateContingent(UpdateContingentCmd cmd)
+    {
+        if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
+            throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
+
+        var contingent = await db.Contingents
+            .FirstOrDefaultAsync(c => c.Id == cmd.Id)
+            ?? throw new EventServiceNotFoundException($"Contingent {cmd.Id} not found.");
+
+        if (contingent.Version != cmd.Version)
+            throw new EventServiceException($"The contingent has already changed.");
+
+        var show = await db.Shows
+            .FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
+            ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
+
+        contingent.Show = show;
+        contingent.ContingentType = contingentType;
+        contingent.AvailableTickets = cmd.AvailableTickets;
+        contingent.Version = timeProvider.GetTimestamp();
+        // UPDATE "Contingents" SET "AvailableTickets" = 80, "ContingentType" = Floor, "Version" = 639080503086892609
+        // WHERE "Id" = 1 AND "Version" = 0
+        // RETURNING 1;
+        await SaveChanges();
+    }
+
+    public async Task UpdateAvailableTickets(UpdateContingentAvailableTicketsCmd cmd)
+    {
+        var contingent = await db.Contingents
+            .Include(c => c.Tickets)
+            .FirstOrDefaultAsync(c => c.Id == cmd.Id)
+            ?? throw new EventServiceNotFoundException($"Contingent {cmd.Id} not found.");
+
+        if (cmd.AvailableTickets < contingent.Tickets.Sum(t => t.Pax + 1))
+            throw new EventServiceException($"The number of tickets sold or reserved exceeds the number of tickets currently available.");
+
+        contingent.AvailableTickets = cmd.AvailableTickets;
+        contingent.Version = timeProvider.GetTimestamp();
+        await SaveChanges();
+    }
+
+    public async Task DeleteContingent(int id)
+    {
+        var contingent = await db.Contingents
+            .Include(c => c.Tickets)
+            .FirstOrDefaultAsync(c => c.Id == id)
+            ?? throw new EventServiceNotFoundException($"Contingent {id} not found.");
+
+        if (contingent.Tickets.Any())
+            throw new EventServiceException("The contingent has already sold or reserved all the tickets.");
+
+        db.Contingents.Remove(contingent);
+        await SaveChanges();
+    }
+
+    private async Task SaveChanges()
+    {
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException e)
+        {
+            var message = isDevelopment ? e.InnerException?.Message ?? e.Message : "The record has already changed.";
+            throw new EventServiceException(message);
+        }
+        catch (DbUpdateException e)
+        {
+            var message = isDevelopment ? e.InnerException?.Message ?? e.Message : "Cannot write changes to database.";
+            throw new EventServiceException(message);
+        }
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Services\EventServiceException.cs
+
+[source,csharp]
+----------
+using System;
+
+namespace Eventmanager.Application.Services;
+
+[Serializable]
+public class EventServiceException : Exception
+{
+    public EventServiceException()
+    {
+    }
+
+    public EventServiceException(string? message) : base(message)
+    {
+    }
+
+    public EventServiceException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
+}
+
+----------
+
+== Eventmanager\Eventmanager.Application\Services\EventServiceNotFoundException.cs
+
+[source,csharp]
+----------
+using System;
+
+namespace Eventmanager.Application.Services;
+
+public class EventServiceNotFoundException : EventServiceException
+{
+    public EventServiceNotFoundException()
+    {
+    }
+
+    public EventServiceNotFoundException(string? message) : base(message)
+    {
+    }
+
+    public EventServiceNotFoundException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
+}
+----------
+
+== Eventmanager\Eventmanager.Application\Services\IEventService.cs
+
+[source,csharp]
+----------
+using Eventmanager.Application.Commands;
+using Eventmanager.Model;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Application.Services;
+
+public interface IEventService
+{
+    IQueryable<Contingent> Contingents { get; }
+    Task<Contingent> CreateContingent(CreateContingentCmd cmd);
+    Task UpdateContingent(UpdateContingentCmd cmd);
+    Task UpdateAvailableTickets(UpdateContingentAvailableTicketsCmd cmd);
+    Task DeleteContingent(int id);
+}
+----------

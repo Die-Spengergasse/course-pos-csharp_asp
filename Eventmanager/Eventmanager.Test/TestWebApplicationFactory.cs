@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Hosting;
+﻿using HotChocolate.Execution;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,15 +12,23 @@ using System.Threading.Tasks;
 
 namespace Eventmanager.Test;
 
+/// <summary>
+/// Helperklasse für Integrationtests.
+/// Usage (with time provider from Microsoft.Extensions.TimeProvider.Testing):
+///     _timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 2, 28, 16, 30, 0, TimeSpan.Zero));
+///     _factory = new TestWebApplicationFactory<EventContext>(_timeProvider);
+/// Usage without time Provider
+///     _factory = new TestWebApplicationFactory<EventContext>();
+/// </summary>
 public class TestWebApplicationFactory<Tcontext> : WebApplicationFactory<Program> where Tcontext : DbContext
 {
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
-    private readonly TimeProvider _timeProvider;
+    private readonly TimeProvider? _timeProvider;
 
-    public TestWebApplicationFactory(TimeProvider timeProvider)
+    public TestWebApplicationFactory(TimeProvider? timeProvider = null)
     {
         _timeProvider = timeProvider;
     }
@@ -35,12 +44,13 @@ public class TestWebApplicationFactory<Tcontext> : WebApplicationFactory<Program
                 options.UseSqlite("DataSource=api_test.db");
             });
             var timeProvider = services.FirstOrDefault(d => d.ServiceType == typeof(TimeProvider));
-            if (timeProvider is not null)
+            if (timeProvider is not null && _timeProvider is not null)
             {
                 services.Remove(timeProvider);
                 services.AddSingleton<TimeProvider>(opt => _timeProvider);
             }
         });
+        // To avoid seeding the database used in development mode.
         builder.UseEnvironment("Testing");
     }
     public void InitializeDatabase(Action<Tcontext> action)

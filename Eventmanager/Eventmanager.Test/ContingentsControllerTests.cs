@@ -19,7 +19,7 @@ public class ContingentsControllerTests : IDisposable
         _factory = new TestWebApplicationFactory<EventContext>(_timeProvider);
     }
     /// <summary>
-    /// Erstellt zentral Testdaten für alle Unittests.
+    /// Creates global test data for all unit tests.
     /// </summary>
     private void GenerateFixtures()
     {
@@ -33,7 +33,7 @@ public class ContingentsControllerTests : IDisposable
         });
     }
     /// <summary>
-    /// Prüft, ob GET /api/contingents/{id} HTTP 200 und ein ContingentDto liefert.
+    /// Checks whether GET /api/contingents/{id} returns HTTP 200 and a ContingentDto.
     /// </summary>
     [Fact]
     public async Task GetContingentByIdReturns200WithDataTest()
@@ -45,7 +45,7 @@ public class ContingentsControllerTests : IDisposable
         Assert.True(contingent.Id != default);
     }
     /// <summary>
-    /// Prüft, ob POST /api/contingents HTTP 201 mit ID liefert und die Datenbank ändert.
+    /// Checks whether POST /api/contingents returns HTTP 201 with ID and modifies the database.
     /// </summary>
     [Fact]
     public async Task CreateContingentReturns201Test()
@@ -60,7 +60,7 @@ public class ContingentsControllerTests : IDisposable
         Assert.True(content.GetProperty("id").GetInt32() != default);
     }
     /// <summary>
-    /// Prüft, ob PUT /api/contingents/{id} HTTP 204 liefert und die Datenbank ändert.
+    /// Checks whether PUT /api/contingents/{id} returns HTTP 204 and modifies the database.
     /// </summary>
     [Fact]
     public async Task UpdateContingentReturns204Test()
@@ -74,7 +74,7 @@ public class ContingentsControllerTests : IDisposable
         Assert.True(contingentFromDb.ContingentType == ContingentType.Floor);
     }
     /// <summary>
-    /// Prüft, ob DELETE /api/contingents/{id} HTTP 204 liefert und die Datenbank ändert.
+    /// Checks whether DELETE /api/contingents/{id} returns HTTP 204 and modifies the database.
     /// </summary>
     [Fact]
     public async Task DeleteContingentReturns204Test()
@@ -86,7 +86,7 @@ public class ContingentsControllerTests : IDisposable
         Assert.Null(contingentFromDb);
     }
     /// <summary>
-    /// Prüft, ob POST /api/contingents HTTP 400 mit der entsprechenden Fehlermeldung im problem detail liefert.
+    /// Checks whether POST /api/contingents returns HTTP 400 with the corresponding error message in the problem detail.
     /// </summary>
     [Theory]
     [InlineData("xxx", 1, "invalid value for contingent type")]
