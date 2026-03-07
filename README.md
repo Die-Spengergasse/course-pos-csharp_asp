@@ -1,4 +1,9 @@
-# ASP.NET Core
+# API Entwicklung mit ASP.NET Core
+
+> [!NOTE]
+> Im Ordner [Eventmanager](Eventmanager) befindet sich die fertige Applikation mit den gezeigten Beispielen.
+> Klone das Repo mit `git clone https://github.com/Die-Spengergasse/course-pos-csharp_asp` und starte die sln Datei.
+> .NET 10 ist erforderlich.
 
 ## Inhalt
 

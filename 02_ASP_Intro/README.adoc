@@ -63,7 +63,7 @@ dotnet new webapi
 dotnet add reference ..\EventManager.Application
 dotnet add package Swashbuckle.AspNetCore.SwaggerUI --version 10.*
 cd ..
-dotnet new sln -f sln
+dotnet new sln -n EventManager -f sln
 dotnet sln add EventManager.Api
 dotnet sln add EventManager.Application
 start EventManager.sln
@@ -167,7 +167,7 @@ public class Program
         builder.Services.AddControllers();
 
         // Configure Datebase with settings from appsettings.json (section ConnectionStrings)
-        builder.Services.AddDbContext<EventContext>(options => 
+        builder.Services.AddDbContextFactory<EventContext>(options =>
             options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
         // STEP 2: Configuring ASP.NET Core request pipeline
@@ -218,7 +218,7 @@ builder.Services.AddControllers(); // <2>
 
 [source,csharp]
 ----
-builder.Services.AddDbContext<EventContext>(options => 
+builder.Services.AddDbContextFactory<EventContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 ----
 
