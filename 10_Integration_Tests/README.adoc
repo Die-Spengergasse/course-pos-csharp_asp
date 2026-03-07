@@ -95,7 +95,6 @@ Sie hat folgende Methoden, die wir danach in unseren Integration Tests nutzen:
 
 
 void InitializeDatabase(Action<Tcontext> action)::	
-+
 Initialisiert die Datenbank mit einer vorgegebenen Methode.
 Da wir über den Serviceprovider auf die Datenbank zugreifen müssen, führt diese Methode folgende Schritte vor der Ausführung der übergebenen Funktion durch:
 +
@@ -103,6 +102,7 @@ Da wir über den Serviceprovider auf die Datenbank zugreifen müssen, führt die
 * Löschen und neu Erstellen der Datenbank.
 +
 Konkret wird diese Methode z. B. so verwendet:
++
 [source,csharp]
 ----
 _factory.InitializeDatabase(db =>
@@ -116,11 +116,11 @@ _factory.InitializeDatabase(db =>
 ----
 
 Tout QueryDatabase<Tout>(Func<Tcontext, Tout> query)::
-+
 Erlaubt das Abfragen der Datenbank durch den DbContext.
 Die Methode ruft das Service aus dem Service Provider ab und führt die übergebene Methode aus.
 +
 Konkret wird diese Methode z. B. so verwendet:
++
 [source,csharp]
 ----
 var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.First(c => c.Id == 2));
@@ -128,7 +128,6 @@ var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.First(c => c.
 
 Task<(HttpResponseMessage, T?)> GetHttpContent<T>(string requestUrl) where T : class::
 Task<(HttpResponseMessage, JsonElement)> GetHttpContent(string requestUrl)::
-+
 Sendet einen GET Request an die angegebene Adresse.
 Die Adresse muss keine Domain beinhalten, da der Port dynamisch zugewiesen wird.
 Wenn ein typisiertes Ergebnis geliefert wird, kann die DTO Klasse bzw. eine Liste der DTO Klasse als Typparameter angegeben werden.
@@ -136,6 +135,7 @@ Wird kein Typparameter angegeben, wird ein JSON Element, also die "rohe" JSON An
 Die Methode liefert ein Tupel aus 2 Elementen zurück.
 +
 Konkret wird diese Methode z. B. so verwendet:
++
 [source,csharp]
 ----
 var (response, content) = await _factory.GetHttpContent<ContingentDto>("/api/contingents/1");
@@ -149,12 +149,12 @@ Da wir einen Typparameter (_ContingentDto_) angegeben haben, hat diese Variable 
 Task<(HttpResponseMessage, JsonElement)> PostHttpContent<Tcmd>(string requestUrl, Tcmd payload) where Tcmd : class::
 Task<(HttpResponseMessage, JsonElement)> PutHttpContent<Tcmd>(string requestUrl, Tcmd payload) where Tcmd : class::
 Task<(HttpResponseMessage, JsonElement)> PatchHttpContent<Tcmd>(string requestUrl, Tcmd payload) where Tcmd : class::
-+
 Sendet einen POST, PUT oder PATCH Request.
 Der Parameter _requestUrl_ ist wieder die Adresse.
 Der Parameter _paylad_ ist die Instanz eines command objects.
 +
 Konkret wird diese Methode z. B. so verwendet:
++
 [source,csharp]
 ----
 var (response, content) = await _factory.PostHttpContent(
@@ -163,18 +163,17 @@ var (response, content) = await _factory.PostHttpContent(
 ----
 
 Task<(HttpResponseMessage, JsonElement)> DeleteHttpContent(string requestUrl)::
-+
 Sendet einen DELETE Request.
 Der Parameter _requestUrl_ ist wieder die Adresse.
 +
 Konkret wird diese Methode z. B. so verwendet:
++
 [source,csharp]
 ----
 var (response, content) = await _factory.DeleteHttpContent("/api/contingents/1");
 ----
 
 bool ContentContainsErrorMessage(JsonElement content, string message)::
-+
 Prüft, ob eine problem detail Antwort eine definierte Fehlermeldung enthält.
 Die RFC problem detail kann 2 Formen haben.
 +

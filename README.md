@@ -2,6 +2,8 @@
 
 ## Inhalt
 
+Mit ⊛ gekennzeichnete Kapitel sind Erweiterungskapitel.
+
 ### Controller und Services in ASP.NET Core
 
 - [RESTful APIs](./01_Rest/README.adoc)
@@ -13,6 +15,7 @@
 ### Testen
 
 - [Integration Tests mit ASP.NET Core](./10_Integration_Tests/README.adoc)
+- ⊛ [Mocking mit NSubstitute](./11_Mocking/README.adoc)
 
 ### Installation von Visual Studio 2026
 

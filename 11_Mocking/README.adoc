@@ -1,0 +1,163 @@
+= Mocking mit NSubstitute
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+== Warum Mocking?
+
+Integration Tests prüfen das gesamte System (inklusive Datenbank und Routing).
+Das ist wichtig, aber diese Tests sind vergleichsweise langsam und aufwendig aufzusetzen, besonders wenn wir gezielt Randfälle oder Fehlerzustände (z. B. "Datenbank nicht erreichbar", "Eintrag nicht gefunden") testen wollen.
+
+Echte Unit Tests zeichnen sich durch absolute Isolation aus.
+Wenn wir z. B. eine Controllerklasse testen wollen, wollen wir nur die Logik testen, nicht die dahinterliegende Datenbank oder den Service.
+
+Da unser Controller aber über Dependency Injection von einem Service (z. B. _IEventService_) abhängig ist, müssen wir diesen Service "vortäuschen". 
+Dieser Vorgang wird _Mocking_ genannt.
+Ein Mock ist ein Dummy-Objekt, das das Interface implementiert, aber keine echte Logik besitzt.
+Wir können dem Mock genau vorschreiben, wie er sich verhalten soll.
+
+== Das Paket NSubstitute
+
+Für C# gibt es verschiedene Mocking-Frameworks. Wir verwenden _NSubstitute_, da es sich durch eine besonders klare, lesbare und flüssige Syntax auszeichnet.
+
+Um NSubstitute in einem Testprojekt zu verwenden, und _IQueryable_ zu mocken, müssen folgende Dependencies installiert werden:
+
+[source,xml]
+----
+<PackageReference Include="NSubstitute" Version="5.*" />
+<PackageReference Include="MockQueryable.NSubstitute" Version="10.*" />
+----
+
+=== Grundfunktionen von NSubstitute
+
+NSubstitute fügt sich nahtlos in das bekannte _Arrange - Act - Assert_ Schema ein.
+
+Mock erstellen mit _Substitute.For<T>()_::
+Erzeugt ein leeres Dummy-Objekt basierend auf einem Interface.
++
+[source,csharp]
+----
+var eventServiceMock = Substitute.For<IEventService>();
+var controller = new ContingentsController(eventServiceMock);
+----
+
+Rückgabewerte definieren mit _Returns()_::
+Bestimmt, was eine Methode zurückgeben soll, wenn sie mit bestimmten Parametern aufgerufen wird (Arrange).
++
+[source,csharp]
+----
+eventServiceMock.CreateContingent(cmd).Returns(expectedContingent);
+----
+
+Exceptions simulieren mit _Throw()_::
+Erzwingt das Werfen einer Exception bei einem Methodenaufruf. Ideal, um Fehlerbehandlung (z. B. try-catch Blöcke im Controller) zu testen, ohne komplexe Datenbankzustände herbeiführen zu müssen.
++
+[source,csharp]
+----
+eventServiceMock
+    .When(x => x.DeleteContingent(999))
+    .Throw(new EventServiceNotFoundException("Not found."));
+----
+
+Interaktionen verifizieren mit _Received()_::
+Prüft im Nachhinein, ob der Controller eine bestimmte Methode des Services auch wirklich aufgerufen hat (Assert).
++
+[source,csharp]
+----
+await eventServiceMock.Received(1).CreateContingent(cmd);
+----
+
+=== Weitere nützliche NSubstitute-Methoden (erweiterte Funktionen)
+
+Oft reicht ein einfaches _Returns()_ oder _Received()_ nicht aus, um komplexe Logik abzubilden. NSubstitute bietet dafür weitere mächtige Werkzeuge:
+
+Argument Matchers mit _Arg.Any<T>()_ und _Arg.Is<T>()_::
+Manchmal ist uns der genaue Parameterwert bei einem Methodenaufruf egal, oder wir können ihn im Test gar nicht genau vorhersagen (z. B. wenn der Controller intern ein neues Datum oder eine Guid generiert). Hierfür nutzen wir _Argument Matchers_.
++
+[source,csharp]
+----
+// Gibt immer true zurück, egal welche ID übergeben wird
+eventServiceMock.DeleteContingent(Arg.Any<int>()).Returns(true);
+
+// Gibt nur dann das Dummy-Objekt zurück, wenn die ID größer als 0 ist
+eventServiceMock.GetContingent(Arg.Is<int>(id => id > 0)).Returns(dummyContingent);
+----
+
+Nicht-Aufrufe verifizieren mit _DidNotReceive()_::
+Genauso wichtig wie das Prüfen, ob eine Methode aufgerufen wurde, ist der Test, ob eine Methode **nicht** aufgerufen wurde (z. B. darf bei einem Validierungsfehler im Controller niemals die Datenbank-Speichern-Methode des Services aufgerufen werden).
++
+[source,csharp]
+----
+// Assert: Prüfen, dass der Service NICHT aufgerufen wurde
+await eventServiceMock.DidNotReceive().CreateContingent(Arg.Any<CreateContingentCmd>());
+----
+
+Sequentielle Rückgabewerte (Mehrere Parameter bei _Returns_)::
+Wird eine Methode des Mocks in einem Testlauf mehrfach aufgerufen, können wir eine Liste von Werten definieren, die nacheinander zurückgegeben werden.
++
+[source,csharp]
+----
+// Erster Aufruf liefert 1, zweiter Aufruf liefert 2, danach immer 3
+mock.GetNextNumber().Returns(1, 2, 3);
+----
+
+Callbacks ausführen mit _Do()_ oder im _Returns()_::
+Wenn wir die Argumente, die an den Mock übergeben werden, genauer untersuchen oder verändern wollen, können wir Callbacks nutzen. Dies ist nützlich, wenn der Controller Objekte manipuliert, bevor er sie an den Service übergibt.
++
+[source,csharp]
+----
+// Fängt das übergebene Command ab und führt eigenen Code im Test aus
+eventServiceMock.When(x => x.UpdateContingent(Arg.Any<UpdateContingentCmd>()))
+    .Do(callInfo => 
+    {
+        var passedCmd = callInfo.Arg<UpdateContingentCmd>();
+        Console.WriteLine($"Service wurde mit ShowId {passedCmd.ShowId} aufgerufen.");
+    });
+----
+
+== Mocken von IQueryable bei Entity Framework Core
+
+Oft geben Repositories oder Services ein _IQueryable<T>_ zurück (z. B. _IQueryable<Contingent>_ zum Zugriff auf _Contingents_).
+Wenn der Controller daraufhin asynchrone LINQ-Methoden wie _FirstOrDefaultAsync()_ aufruft, entsteht beim einfachen Mocken ein Problem.
+
+Um dieses Problem elegant zu lösen, ohne aufwendige eigene Provider schreiben zu müssen, nutzen wir das Paket _MockQueryable.NSubstitute_.
+Dieses Paket stellt die Extension-Method _BuildMock()_ zur Verfügung. Sie wandelt eine gewöhnliche _List<T>_ in ein spezielles Mock-Objekt um, das asynchrone EF Core Befehle problemlos verarbeiten kann.
+
+=== Konkretes Beispiel: IQueryable mocken
+
+In link:../Eventmanager/Eventmanager.Test/ContingentsControllerWithServiceMockTests.cs[🔗 ContingentsControllerWithServiceMockTests.cs] ist eine Testklasse implementiert, die den _ContingentsController_ auf _Klassenebene_ testet.
+
+Der nachfolgende Code zeigt, wie man eine Liste erstellt, sie mockt und an den Controller übergibt, damit _FirstOrDefaultAsync()_ erfolgreich getestet werden kann.
+
+[source,csharp]
+----
+// 1. Arrange: Normale Liste mit Dummy-Daten erstellen
+var contingentsList = new List<Contingent>
+{
+    new Contingent(dummyShow, ContingentType.Floor, 100) { Id = 1 },
+    new Contingent(dummyShow, ContingentType.Rang, 50) { Id = 2 }
+};
+
+// 2. IQueryable Mock konfigurieren (Wichtig: using MockQueryable; nicht vergessen!)
+var mockQueryable = contingentsList.BuildMock();
+_eventServiceMock.Contingents.Returns(mockQueryable);
+
+// 3. Act: Controller aufrufen
+var actionResult = await _controller.GetContingentById(2);
+
+// 4. Assert: Prüfen, ob das richtige Element gefunden und gemappt wurde
+var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+var returnedDto = Assert.IsType<ContingentDto>(okResult.Value);
+Assert.Equal(2, returnedDto.Id);
+----
+
