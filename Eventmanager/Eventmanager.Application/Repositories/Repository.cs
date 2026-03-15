@@ -3,6 +3,7 @@
 // Michael Schletz, 2026-03-13
 // =================================================================================================
 using Eventmanager.Application.Model;
+using GreenDonut;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Linq;
@@ -21,6 +22,18 @@ public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
     }
 
     /// <summary>
+    /// Finds an entity of the repository's primary type by its identifier.
+    /// </summary>
+    public virtual Task<TEntity?> FindByIdAsync(int id)
+        => db.Set<TEntity>().FirstOrDefaultAsync(e => e.Id == id);
+
+    /// <summary>
+    /// Finds an entity of the repository's primary type by its identifier and eagerly loads the specified navigation properties.
+    /// </summary>
+    public virtual Task<TEntity?> FindByIdAsync(int id, params string[] includeNavigations)
+        => FindByIdAsync<TEntity>(id, includeNavigations);
+
+    /// <summary>
     /// Finds an entity of a specified type by its identifier. 
     /// Useful for quickly resolving foreign key constraints without needing a separate repository.
     /// </summary>
@@ -29,18 +42,10 @@ public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
         => db.Set<TOtherEntity>().FirstOrDefaultAsync(e => e.Id == id);
 
     /// <summary>
-    /// Finds an entity of the repository's primary type by its identifier.
-    /// </summary>
-    public virtual Task<TEntity?> FindByIdAsync(int id)
-        => db.Set<TEntity>().FirstOrDefaultAsync(e => e.Id == id);
-
-    /// <summary>
     /// Finds an entity of a specified type by its identifier and eagerly loads the specified navigation properties.
     /// </summary>
     public virtual Task<TOtherEntity?> FindByIdAsync<TOtherEntity>(
-        int id,
-        params string[] includeNavigations)
-        where TOtherEntity : Entity
+        int id, params string[] includeNavigations) where TOtherEntity : Entity
     {
         var query = db.Set<TOtherEntity>().AsQueryable();
         foreach (var include in includeNavigations)
@@ -48,12 +53,6 @@ public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
 
         return query.FirstOrDefaultAsync(e => e.Id == id);
     }
-
-    /// <summary>
-    /// Finds an entity of the repository's primary type by its identifier and eagerly loads the specified navigation properties.
-    /// </summary>
-    public virtual Task<TEntity?> FindByIdAsync(int id, params string[] includeNavigations)
-        => FindByIdAsync<TEntity>(id, includeNavigations);
 
     /// <summary>
     /// Asynchronously determines whether any entity of the repository's primary type satisfies the specified condition.
@@ -64,7 +63,7 @@ public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
     /// <summary>
     /// Executes a custom query function against the primary entity set.
     /// </summary>
-    public virtual Tresult Query<Tresult>(Func<IQueryable<TEntity>, Tresult> queryFunc)
+    public virtual TResult Query<TResult>(Func<IQueryable<TEntity>, TResult> queryFunc)
         => queryFunc(db.Set<TEntity>());
 
     /// <summary>

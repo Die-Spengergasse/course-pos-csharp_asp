@@ -17,7 +17,8 @@ heading:
   h5_font_size: $base_font_size
   h6_font_size: $base_font_size_small
 code:
-  font_size: ceil($base_font_size * 0.8)
+  # font_size: $base_font_size_small
+  font_size: $base_font_size
   line_height: 1.15
 list:
   item_spacing: $vertical_rhythm / 6

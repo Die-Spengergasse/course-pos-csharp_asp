@@ -26,6 +26,7 @@ Mit ○ gekennzeichnete Kapitel sind Erweiterungskapitel.
 - [Servicetests mit der SQLite in-memory DB](./10_Service_Tests/README.adoc)
 - [Integration Tests mit ASP.NET Core](./11_Integration_Tests/README.adoc)
 - ○ [Mocking mit NSubstitute](./12_Mocking/README.adoc)
+- ○ [Das Repository Pattern](./13_Repository/README.adoc)
 
 ### Übungen
 

@@ -1,6 +1,8 @@
 using Eventmanager.Application.Model;
+using Eventmanager.Application.Repositories;
 using Eventmanager.Application.Services;
 using Eventmanager.Infrastructure;
+using Eventmanager.Model;
 using IdHasher;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Data.Sqlite;
@@ -33,6 +35,9 @@ public class Program
             db: provider.GetRequiredService<EventContext>(),
             timeProvider: provider.GetRequiredService<TimeProvider>(),
             isDevelopment: builder.Environment.IsDevelopment()));
+
+        builder.Services.AddScoped<IRepository<Show>, Repository<Show>>((provider) =>
+            new Repository<Show>(db: provider.GetRequiredService<EventContext>()));
 
         Id.Secret = Convert.FromBase64String(
             builder.Configuration["IdEncoderSecret"] ?? throw new Exception("Missing IdEncoderSecret."));

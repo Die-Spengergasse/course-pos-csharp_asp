@@ -55,16 +55,20 @@ public class EventService(EventContext db, bool isDevelopment)    // <1>
 {
     public IQueryable<Contingent> Contingents => db.Contingents.AsQueryable();  // <2>
 
-    public async Task<Contingent> CreateContingent(CreateContingentCmd cmd)      // <3>
+    public async Task<Contingent> CreateContingent(CreateContingentCmd cmd)     // <3>
     {
-        if (!Enum.TryParse<ContingentType>(cmd.ContingentType, ignoreCase: true, out var contingentType))
-            throw new EventServiceException($"{cmd.ContingentType} is not a valid contingent type.");
+        if (!Enum.TryParse<ContingentType>(
+            cmd.ContingentType, ignoreCase: true, out var contingentType))
+            throw new EventServiceException(
+                $"{cmd.ContingentType} is not a valid contingent type.");
 
         var show = await db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)
             ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
 
-        if (await db.Contingents.AnyAsync(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
-            throw new EventServiceException($"Show has already a contingent for {cmd.ContingentType}.");
+        if (await db.Contingents.AnyAsync(
+            c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
+            throw new EventServiceException(
+                $"Show has already a contingent for {cmd.ContingentType}.");
 
         var contingent = new Contingent(show, contingentType, cmd.AvailableTickets);
         db.Add(contingent);
@@ -80,7 +84,9 @@ public class EventService(EventContext db, bool isDevelopment)    // <1>
         }
         catch (DbUpdateException e)
         {
-            var message = isDevelopment ? e.InnerException?.Message ?? e.Message : "Cannot write changes to database.";
+            var message = isDevelopment 
+                ? e.InnerException?.Message ?? e.Message 
+                : "Cannot write changes to database.";
             throw new EventServiceException(message);
         }
     }
@@ -256,13 +262,15 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
         // ...
-        // Configure Datebase with settings from appsettings.json (section ConnectionStrings)
+        // Configure Datebase with settings from
+        // appsettings.json (section ConnectionStrings)
         builder.Services.AddDbContext<EventContext>(options =>
             options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
-        builder.Services.AddScoped<IEventService, EventService>((provider) => new EventService(
-            db: provider.GetRequiredService<EventContext>(),
-            isDevelopment: builder.Environment.IsDevelopment()));
+        builder.Services.AddScoped<IEventService, EventService>(
+            (provider) => new EventService(
+                db: provider.GetRequiredService<EventContext>(),
+                isDevelopment: builder.Environment.IsDevelopment()));
         // ...
     }
 }
@@ -328,14 +336,16 @@ public class ContingentsController(IEventService eventService) : ControllerBase
                 c.Id, c.Show.Id, c.Show.Date,
                 c.Show.Event.Name, c.ContingentType.ToString(), c.AvailableTickets))
             .FirstOrDefaultAsync();
-        if (contingent is null) return Problem("Contingent not found.", statusCode: 404);
+        if (contingent is null) 
+            return Problem("Contingent not found.", statusCode: 404);
         return Ok(contingent);
     }
 
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateContingent([FromBody] CreateContingentCmd cmd)
+    public async Task<IActionResult> CreateContingent(
+        [FromBody] CreateContingentCmd cmd)
     {
         try
         {

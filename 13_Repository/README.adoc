@@ -1,0 +1,610 @@
+= ○ Das Repository Pattern
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::root_dir[:root_dir: .]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+image::{root_dir}/repository_architecture_1402.jpg[]
+
+== Das Problem mit dem DbContext
+
+Wenn wir unseren _EventService_ betrachten, fordert es 3 Dependencies im Konstruktor an:
+
+[source,csharp]
+----
+public class EventService(
+    EventContext db, TimeProvider timeProvider, bool isDevelopment) { }
+----
+
+Dependencies sollen folgenden Kriterien entsprechen:
+
+* Sie sollten minimal sein.
+  Fordere nur Features an, die du auch brauchst.
+  Das erleichtert das Mocken.
+* Beziehe dich auf Interfaces, nicht auf konkrete Implementierungen.
+
+Der _EventContext_, abgeleitet von _DbContext_ ist eine sehr mächtige Klasse, die die gesamte Datenbank manipulieren kann.
+Es geht aus dieser Dependency nicht hervor, welche Features _genau_ wir von der Datenbank brauchen.
+
+Ein weiteres Problem sind die Properties vom Typ _DbSet_ in _EventContext_.
+
+[source,csharp]
+----
+public class EventContext : DbContext
+{
+    public DbSet<Contingent> Contingents => Set<Contingent>();
+    public DbSet<Event> Events => Set<Event>();
+    public DbSet<Guest> Guests => Set<Guest>();
+    public DbSet<Show> Shows => Set<Show>();
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+
+    public EventContext()
+    { }
+}
+----
+
+Im Kapitel _Mocking_ haben wir zwar die Technik gelernt, wie Properties vom Typ _IQueryable_ (den das _DbSet_ unter anderem implementiert) gemockt werden können, dies ist jedoch mit viel Aufwand verbunden.
+
+Daher können wir zwischen Service und Datenbank eine Zwischenschicht definieren: das _Repository_.
+
+== Implementierung eines Repositories
+
+=== Das generische Repository
+
+Wir beginnen einmal mit der Implementierung der Klasse _Repository_.
+Es bekommt als Dependency einen allgemeinen _DbContext_.
+Da wir das Feld _db_ explizit mit der Sichtbarkeit _protected_ definieren müssen (damit abgeleitete Klassen darauf zugreifen können), ist der klassische Konstruktor hier übersichtlicher als ein Primary Constructor, der Felder standardmäßig _private_ anlegt
+
+[source,csharp]
+----
+public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
+{
+    protected readonly DbContext db;
+
+    public Repository(DbContext db)
+    {
+        this.db = db;
+    }
+}
+----
+
+[NOTE]
+====
+Repositories beziehen sich auf ein (1) Entity. Sie abstrahieren technisch gesehen das DbSet, nicht den DbContext.
+====
+
+==== Die Basisklasse _Entity_ für alle Entities
+
+Die _Repository_ Klasse ist generisch, d. h. sie kann mit jedem Entity verwendet werden.
+Damit wir nicht beliebige Klassen verwenden können, schränken wir mit _where TEntity : Entity_ auf alle Klassen ein, die von _Entity_ abgeleitet sind.
+Diese Klasse ist im Projekt definiert und ist die Basisklasse aller Entities.
+Sie definiert das _Id_ Property.
+Das ist wichtig, damit wir bei den lesenden Methoden auf _Id_ zugreifen können.
+Die Modelklassen leiten sich dann von _Entity_ ab.
+
+.link:../Eventmanager/Eventmanager.Application/Model/Entity.cs[→ Entity.cs]
+[source,csharp]
+----
+public abstract class Entity
+{
+    public int Id { get; set; }
+}
+----
+
+==== Die Schreibmethoden im generischen Repository
+
+Zuerst definieren wir in der generischen Klasse _Repository_ die Methoden, die die Insert, Update und Delete Funktionen abbilden.
+
+[source,csharp]
+----
+public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
+{
+    /* ... */
+    public virtual async Task<TEntity> CreateAndSave(TEntity entity)
+    {
+        db.Entry(entity).State = EntityState.Added;
+        await db.SaveChangesAsync();
+        return entity;
+    }
+
+    public virtual async Task UpdateAndSave(TEntity entity)
+    {
+        db.Entry(entity).State = EntityState.Modified;
+        await db.SaveChangesAsync();
+    }
+
+    public virtual async Task DeleteAndSave(TEntity entity)
+    {
+        db.Entry(entity).State = EntityState.Deleted;
+        await db.SaveChangesAsync();
+    }
+}
+----
+
+[NOTE]
+====
+Den Aufruf von _SaveChangesAsync_ in den einzelnen Methoden müssen wir kritisch betrachten.
+Es beginnt eine Transaktion mit einer Anweisung und beendet diese.
+Möchten wir im Service zwei zusammenhängende Änderungen durchführen, und die zweite Anweisung schlägt fehl, ist die erste Änderung schon geschrieben und wird nicht rückgängig gemacht.
+Eine Lösung wäre das Auslagern von _SaveChangesAsync_ in eine eigene Methode im Repository.
+Deswegen enden die Methoden auch mit _AndSave_, damit dieses Verhalten klar hervorgeht.
+====
+
+==== Die Lesemethoden im generischen Repository
+
+Zuerst diskutieren wir die grundlegenden Lesemethoden, wie sie klassisch in einem Repository vorhanden sind:
+
+[source,csharp]
+----
+public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
+{
+   /* ... */
+    public virtual Task<TEntity?> FindByIdAsync(int id)
+        => db.Set<TEntity>().FirstOrDefaultAsync(e => e.Id == id);
+    public virtual Task<TEntity?> FindByIdAsync(int id, params string[] includeNavigations)
+        => FindByIdAsync<TEntity>(id, includeNavigations);
+    public virtual Task<bool> ExistsAsync(Expression<Func<TEntity, bool>> predicate)
+        => db.Set<TEntity>().AnyAsync(predicate);
+}
+----
+
+Task<TEntity?> FindByIdAsync(int id)::
+Die häufigste Operation ist sicher das Suchen nach dem Primärschlüssel.
+Mit _await eventsRepo.FindByIdAsync(2)_ kann z. B. nach dem Event mit der ID 2 gesucht werden.
+
+Task<TEntity?> FindByIdAsync(int id, params string[] includeNavigations)::
+Etwas spezieller ist diese Methode. 
+Oft wollen wir Entities inklusive ihrer Navigation-Properties (verbundene Daten) laden.
+Ohne diesen Include wären diese Properties null bzw. leere Listen.
+Mit _await eventsRepo.FindByIdAsync(2, nameof(Event.Shows))_ können wir das Event mit der ID 2 samt ihren Shows laden.
+
+Task<bool> ExistsAsync(Expression<Func<TEntity, bool>> predicate)::
+Für Existenzabfragen stellen wir eine Methode bereit.
+So kann z. B. mit _await eventsRepo.ExistsAsync(e => !e.Shows.AnyAsync())_ geprüft werden, ob ein Event ohne Shows existiert.
+Die Methode liefert wie _AnyAsync_ einen _boolean_ Wert zurück.
+
+==== Lesemethoden für andere Entities: Der Kompromiss
+
+Wie immer im Leben müssen wir hier auch einen Kompromiss zwischen reiner Architektur und Praxis eingehen.
+Oft müssen wir z. B. in einer Servicemethode einen Fremdschlüssel auflösen.
+Mit _await db.Shows.FirstOrDefaultAsync(s => s.Id == cmd.ShowId)_ wollen wir z. B. die Show mit einer bestimmten ID lesen.
+Steht uns nur das Repository für Contingents zur Verfügung, brauchen wir extra ein _ShowsRepository_.
+Beim Controller wird es überhaupt schwierig.
+Er verwendet LINQ, um auf die DTO Klassen zu projizieren.
+
+Würden wir in den Repositories mit Listen arbeiten, können wir die Vorteile von _IQueryable_ nicht nutzen:
+Er generiert SQL Klauseln, die nur die benötigten Daten liefern.
+
+Daher definieren wir auch Lesemethoden für andere Entities mit dem Typparameter _TOther_.
+
+[source,csharp]
+----
+public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
+{
+    public virtual Task<TOtherEntity?> FindByIdAsync<TOtherEntity>(int id)
+        where TOtherEntity : Entity
+        => db.Set<TOtherEntity>().FirstOrDefaultAsync(e => e.Id == id);
+
+    public virtual Task<TOtherEntity?> FindByIdAsync<TOtherEntity>(
+        int id,
+        params string[] includeNavigations)
+        where TOtherEntity : Entity
+    {
+        var query = db.Set<TOtherEntity>().AsQueryable();
+        foreach (var include in includeNavigations)
+            query = query.Include(include);
+
+        return query.FirstOrDefaultAsync(e => e.Id == id);
+    }
+
+    public virtual TResult Query<TResult>(Func<IQueryable<TEntity>, TResult> queryFunc)
+        => queryFunc(db.Set<TEntity>());
+}
+----
+
+Die Methode _FindByIdAsync()_ kann nun auf andere Entities angewandt werden.
+So liest z. B. _await eventsRepo.FindById<Show>(2)_ die _Show_ mit der ID 2.
+_await eventsRepo.FindById<Show>(2, nameof(Show.Events))_ findet die _Show_ mit der ID 2 und lädt alle Events dazu.
+
+Die Methode _Query_ ist für die Weitergabe an den Controller gedacht.
+Mit _await eventsRepo.Query(event => events.Select(e => new EventDto(e.Id, e.Name)).ToListAsync())_ kann ein Event auf eine DTO projiziert werden.
+Über _type inference_ des Compilers wird der Rückgabetyp gemäß der übergebenen Funktion gesetzt, d. h. die _Query_ Methode liefert in diesem Fall einen Task mit einer Liste von EventDto Instanzen zurück.
+
+Damit auch der SQL Code entsprechend generiert werden kann, wird der _Query_ Methode eine _Expression_ übergeben. Bei einer _Func_ würde EF Core diese Abfrage clientseitig ausführen.
+
+=== Der gesamte Code und das Interface
+
+.link:../Eventmanager/Eventmanager.Application/Repositories/IRepository.cs[→ IRepository.cs]
+[source,csharp]
+----
+using Eventmanager.Application.Model;
+using System;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Application.Repositories
+{
+    public interface IRepository<TEntity> where TEntity : Entity
+    {
+        Task<TEntity?> FindByIdAsync(int id);
+        Task<TEntity?> FindByIdAsync(
+            int id, params string[] includeNavigations);
+        Task<TOtherEntity?> FindByIdAsync<TOtherEntity>(
+            int id) where TOtherEntity : Entity;
+        Task<TOtherEntity?> FindByIdAsync<TOtherEntity>(
+            int id, params string[] includeNavigations) where TOtherEntity : Entity;
+        Task<bool> ExistsAsync(Expression<Func<TEntity, bool>> predicate);
+        TResult Query<TResult>(Func<IQueryable<TEntity>, TResult> queryFunc);
+        Task<TEntity> CreateAndSave(TEntity entity);
+        Task DeleteAndSave(TEntity entity);
+        Task UpdateAndSave(TEntity entity);
+    }
+}
+----
+
+.link:../Eventmanager/Eventmanager.Application/Repositories/Repository.cs[→ Repository.cs]
+[source,csharp]
+----
+using Eventmanager.Application.Model;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Application.Repositories;
+
+public class Repository<TEntity> : IRepository<TEntity> where TEntity : Entity
+{
+    protected readonly DbContext db;
+
+    public Repository(DbContext db)
+    {
+        this.db = db;
+    }
+
+    public virtual Task<TOtherEntity?> FindByIdAsync<TOtherEntity>(int id)
+        where TOtherEntity : Entity
+        => db.Set<TOtherEntity>().FirstOrDefaultAsync(e => e.Id == id);
+
+    public virtual Task<TEntity?> FindByIdAsync(int id)
+        => db.Set<TEntity>().FirstOrDefaultAsync(e => e.Id == id);
+
+    public virtual Task<TEntity?> FindByIdAsync(
+        int id, params string[] includeNavigations)
+        => FindByIdAsync<TEntity>(id, includeNavigations);
+
+    public virtual Task<TOtherEntity?> FindByIdAsync<TOtherEntity>(
+        int id, params string[] includeNavigations) where TOtherEntity : Entity
+    {
+        var query = db.Set<TOtherEntity>().AsQueryable();
+        foreach (var include in includeNavigations)
+            query = query.Include(include);
+
+        return query.FirstOrDefaultAsync(e => e.Id == id);
+    }
+
+    public virtual Task<bool> ExistsAsync(Expression<Func<TEntity, bool>> predicate)
+        => db.Set<TEntity>().AnyAsync(predicate);
+
+    public virtual TResult Query<TResult>(Func<IQueryable<TEntity>, TResult> queryFunc)
+        => queryFunc(db.Set<TEntity>());
+
+    public virtual async Task<TEntity> CreateAndSave(TEntity entity)
+    {
+        db.Entry(entity).State = EntityState.Added;
+        await db.SaveChangesAsync();
+        return entity;
+    }
+
+    public virtual async Task UpdateAndSave(TEntity entity)
+    {
+        db.Entry(entity).State = EntityState.Modified;
+        await db.SaveChangesAsync();
+    }
+
+    public virtual async Task DeleteAndSave(TEntity entity)
+    {
+        db.Entry(entity).State = EntityState.Deleted;
+        await db.SaveChangesAsync();
+    }
+}
+----
+
+
+=== Spezifische Repositories
+
+Die Klasse _Repository_ ist _nicht abstrakt_, d. h. sie kann in ASP.NET Core in _Program.cs_ registriert werden:
+
+[source,csharp]
+----
+builder.Services.AddScoped<IRepository<Show>, Repository<Show>>((provider) =>
+    new Repository<Show>(db: provider.GetRequiredService<EventContext>()));
+----
+
+Nun kann jedes Service die Dependency _IRepository<Show>_ anfordern und bekommt ein fertiges Show Repository.
+
+Möchten wir spezifischen Code implementieren, können wir natürlich das Repository als Basisklasse verwenden und davon ableiten:
+
+.link:../Eventmanager/Eventmanager.Application/Repositories/IContingentRepository.cs[→ IContingentRepository.cs]
+[source,csharp]
+----
+using Eventmanager.Model;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Application.Repositories;
+
+public interface IContingentRepository : IRepository<Contingent>
+{
+    Task Update(Contingent entity, long version);
+}
+----
+
+.link:../Eventmanager/Eventmanager.Application/Repositories/ContingentRepository.cs[→ ContingentRepository.cs]
+[source,csharp]
+----
+using Eventmanager.Model;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Application.Repositories;
+
+public class ContingentRepository(DbContext db, TimeProvider timeProvider) : Repository<Contingent>(db), IContingentRepository
+{
+    public async Task Update(Contingent entity, long version)
+    {
+        if (entity.Version != version)
+            throw new DbUpdateConcurrencyException($"The contingent has already changed.");
+
+        entity.Version = timeProvider.GetTimestamp();
+        await base.UpdateAndSave(entity);
+    }
+
+    public override Task UpdateAndSave(Contingent entity) => Update(entity, default);
+}
+----
+
+Hier sieht man auch schon, welcher Code in ein Repository kommt: Code, der bei _jeder_ Update Operation ausgeführt werden soll.
+In unserem Fall ist es der Vergleich der Version.
+
+Andere Fälle für Code, der im Repository implementiert werden kann, sind:
+
+* Häufig benutzte Abfragen, meist parametrisiert.
+* Starten von Datenbankprozeduren und Zugriff auf Objekte in der Datenbank.
+* Speziell optimierter SQL Code, der mit den _SqlRaw_ Funktionen in EF Core genutzt wird.
+* Sehr tief liegende Prüfungen, die keine Serviceklasse umgehen darf.
+
+== Verwendung im Service
+
+Das nachfolgende Beispiel zeigt, wie das _ContingentRepository_ verwendet werden kann.
+Es erbt von _Repository<Contingent>_ und hat daher alle oben beschriebenen Methoden enthalten.
+Natürlich kann auch _IRepository<Contingent>_ angefordert werden, falls es kein eigenes _ContingentRepository_ gibt.
+Achte auf die korrekte Registrierung im Serviceprovider in der _Program.cs_.
+
+.link:../Eventmanager/Eventmanager.Application/Services/EventServiceWithRepo.cs[→ EventServiceWithRepo.cs]
+[source,csharp]
+----
+public class EventServiceWithRepo(IContingentRepository contingentRepo, bool isDevelopment)
+{
+    public TResult QueryContingents<TResult>(Func<IQueryable<Contingent>, TResult> queryFunc)
+        => contingentRepo.Query(queryFunc);
+
+    public async Task<Contingent> CreateContingent(CreateContingentCmd cmd)
+    {
+        /* ... */
+        // Find show with type parameter.
+        var show = await contingentRepo.FindByIdAsync<Show>(cmd.ShowId)
+            ?? throw new EventServiceException($"Show {cmd.ShowId} not found.");
+
+        // Use ExistsAsync
+        if (await contingentRepo.ExistsAsync(c => c.Show.Id == cmd.ShowId && c.ContingentType == contingentType))
+            throw new EventServiceException($"Show has already a contingent for {cmd.ContingentType}.");
+
+        var contingent = new Contingent(show, contingentType, cmd.AvailableTickets);
+        await RethrowDbException(() => contingentRepo.CreateAndSave(contingent));
+        return contingent;
+    }
+
+    public async Task UpdateContingent(UpdateContingentCmd cmd)
+    {
+        /* ... */
+        // Use overwritten Version of Update.
+        await RethrowDbException(() => contingentRepo.Update(contingent, cmd.Version));
+    }
+
+    public async Task DeleteContingent(int id)
+    {
+        // Loading with Navigations
+        var contingent = await contingentRepo.FindByIdAsync(id, nameof(Contingent.Tickets))
+            ?? throw new EventServiceNotFoundException($"Contingent {id} not found.");
+
+        if (contingent.Tickets.Any())
+            throw new EventServiceException("The contingent has already sold or reserved all the tickets.");
+
+        await RethrowDbException(() => contingentRepo.DeleteAndSave(contingent));
+    }
+
+    private async Task RethrowDbException(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (DbUpdateConcurrencyException e)
+        {
+            var message = isDevelopment ? e.InnerException?.Message ?? e.Message : "The record has already changed.";
+            throw new EventServiceException(message);
+        }
+        catch (DbUpdateException e)
+        {
+            var message = isDevelopment ? e.InnerException?.Message ?? e.Message : "Cannot write changes to database.";
+            throw new EventServiceException(message);
+        }
+    }
+}
+----
+
+== Unittest mit Mock des Repos
+
+Erst beim Test wird die Stärke des Konzeptes deutlich.
+Wir können nun das Repository mit _NSubstitute_ mocken.
+Das ist auch die häufigste Begründung für die Implementierung des Repository Patterns.
+
+.Quelle: https://learn.microsoft.com/en-us/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/infrastructure-persistence-layer-implementation-entity-framework-core
+image::{root_dir}/custom-repo-versus-db-context.png[]
+
+Eine komplette Testklasse, die die Methoden des Repositories mockt, ist hier abgebildet.
+Sie verwendet die folgenden Mocks:
+
+[%header,cols="a,a",format=tsv]
+|===
+Mock	Bedeutung
+`_contingentRepo.FindByIdAsync<Show>(1).Returns(show);`	Für _CreateContingent_. Liefert die erste Show aus den Fixtures, wenn _FindByIdAsync<Show>_ mit dem Parameter 1 aufgerufen wird.
+"`_contingentRepo.ExistsAsync(
+ Arg.Any<Expression<Func<Contingent, bool>>>()).Returns(false);`"	Für _CreateContingent_. Da die _ExistsAny_ Funktion bei der Prüfung auf vorhandene Kontingente mit gleichem Namen aufgerufen wird, legen wir fest, dass sie false liefert.
+`_contingentRepo.FindByIdAsync<Show>(999).Returns(null as Show);`	Für _CreateContingent_. Um das Verhalten bei einer ungültigen Show im command object zu prüfen. Das command object hat natürlich 999 als _showId_.
+"`_contingentRepo.FindByIdAsync(Arg.Any<int>(), nameof(Contingent.Tickets)).Returns(null as Contingent);`"	 Für _DeleteContingent_. Simuliert ein nicht vorhandenes Kontingent, das wir löschen wollen. Dabei liefert der Mock der Methode für jeden ID Wert _null_.
+"`_contingentRepo.FindByIdAsync(1, nameof(Contingent.Tickets)).Returns(contingent);`"	Für _DeleteContingent_. Bei Delete werden die Navigation Tickets inkludiert. Wir müssen daher ein Kontingent mit Tickets erzeugen und dies als Rückgabewert festlegen.
+|===
+
+
+.link:../Eventmanager/Eventmanager.Test/EventServiceWithRepoTest.cs[→ EventServiceWithRepoTest.cs]
+[source,csharp]
+----
+using Eventmanager.Application.Commands;
+using Eventmanager.Application.Repositories;
+using Eventmanager.Application.Services;
+using Eventmanager.Model;
+using NSubstitute;
+using System;
+using System.Linq.Expressions;
+using System.Threading.Tasks;
+
+namespace Eventmanager.Test;
+
+public class EventServiceWithRepoTest
+{
+    private readonly IContingentRepository _contingentRepo;
+    private readonly EventServiceWithRepo _service;
+
+    public EventServiceWithRepoTest()
+    {
+        _contingentRepo = Substitute.For<IContingentRepository>();
+        _service = new EventServiceWithRepo(_contingentRepo, isDevelopment: true);
+    }
+
+    private (Event[] events, Show[] shows, Contingent[] contingents) GenerateFixtures()
+    {
+        var events = new Event[] { new Event("Event1") { Id = 1 } };
+        var shows = new Show[] 
+        { 
+            new Show(events[0], new DateTime(2026, 6, 12, 18, 0, 0)) { Id = 1 } 
+        };
+        var contingents = new Contingent[] 
+        {
+            new Contingent(shows[0], ContingentType.Rang, 100) 
+        };
+        return (events, shows, contingents);
+    }
+    [Fact]
+    public async Task CreateContingent_WithValidData_CreatesAndSavesContingent()
+    {
+        // Arrange
+        var show = GenerateFixtures().shows[0];
+        var cmd = new CreateContingentCmd(1, "Floor", 10);
+        _contingentRepo.FindByIdAsync<Show>(1).Returns(show);
+        _contingentRepo.ExistsAsync(
+            Arg.Any<Expression<Func<Contingent, bool>>>()).Returns(false);
+
+        // Act
+        var result = await _service.CreateContingent(cmd);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(ContingentType.Floor, result.ContingentType);
+        Assert.Equal(10, result.AvailableTickets);
+        await _contingentRepo.Received(1).CreateAndSave(result);
+    }
+
+
+    [Fact]
+    public async Task CreateContingent_WhenShowDoesNotExist_ThrowsException()
+    {
+        // Arrange
+        var cmd = new CreateContingentCmd(999, "Floor", 10);
+        _contingentRepo.FindByIdAsync<Show>(999).Returns(null as Show);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<EventServiceException>(
+            () => _service.CreateContingent(cmd));
+        Assert.Equal("Show 999 not found.", ex.Message);
+        await _contingentRepo.DidNotReceive().CreateAndSave(Arg.Any<Contingent>());
+    }
+
+    [Fact]
+    public async Task DeleteContingent_WhenContingentHasNoTickets_DeletesAndSaves()
+    {
+        // Arrange
+        var contingent = GenerateFixtures().contingents[0];
+        _contingentRepo.FindByIdAsync(
+            1, nameof(Contingent.Tickets)).Returns(contingent);
+
+        // Act
+        await _service.DeleteContingent(1);
+
+        // Assert
+        await _contingentRepo.Received(1).DeleteAndSave(contingent);
+    }
+
+    [Fact]
+    public async Task DeleteContingent_WhenContingentHasTickets_ThrowsException()
+    {
+        // Arrange
+        var contingent = GenerateFixtures().contingents[0];
+        contingent.Tickets.Add(
+            new Ticket(
+                new Guest("first", "last", new DateOnly(2004, 2, 1)),
+                contingent,
+                TicketState.Sold,
+                new DateTime(2026, 3, 19, 14, 0, 0), 2));
+        _contingentRepo.FindByIdAsync(
+            1, nameof(Contingent.Tickets)).Returns(contingent);
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<EventServiceException>(
+            () => _service.DeleteContingent(1));
+        Assert.Equal(
+            "The contingent has already sold or reserved all the tickets.",
+            ex.Message);
+        // Sicherstellen, dass nichts gelöscht wird
+        await _contingentRepo.DidNotReceive().DeleteAndSave(Arg.Any<Contingent>());
+    }
+
+    [Fact]
+    public async Task DeleteContingent_WhenContingentDoesNotExist_ThrowsNotFoundException()
+    {
+        // Arrange
+        _contingentRepo.FindByIdAsync(Arg.Any<int>(), nameof(Contingent.Tickets))
+            .Returns(null as Contingent);
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<EventServiceNotFoundException>(
+            () => _service.DeleteContingent(1));
+        Assert.Equal("Contingent 1 not found.", ex.Message);
+        // Sicherstellen, dass nichts gelöscht wird
+        await _contingentRepo.DidNotReceive().DeleteAndSave(Arg.Any<Contingent>());
+    }
+}
+
+----
