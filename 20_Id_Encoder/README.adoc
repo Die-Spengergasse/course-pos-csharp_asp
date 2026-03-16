@@ -1,0 +1,243 @@
+= Codierung von ID Werten
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::root_dir[:root_dir: .]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+
+== Das Problem mit auto increment ID Werten
+
+Bisher wurden unsere Ressourcen über den internen Auto-Increment-Wert der Datenbank eindeutig referenziert.
+Dies hat jedoch mehrere Probleme:
+
+* Der User weiß: Wenn er die Ressource mit der ID 13 anfordert, wird es vermutlich auch eine Ressource mit der ID 12 geben.
+  Dies kann als Angriffsvektor verwendet werden.
+* Wenn der User viele Requests mit zufällig gewählter Zahl absendet, gelangt jeder Request bis zur Datenbank.
+
+Daher wollen wir die internen ID Werte nicht herausgeben und sie vor dem Senden codieren.
+Diese Codierung soll bestimmte Eigenschaften haben:
+
+* Der Server kann _ohne Befragung der Datenbank_ feststellen, ob die ID syntaktisch gültig ist.
+* Der User soll nicht selbst codierte IDs erstellen können.
+* Die Codierung und Decodierung sollen möglichst von ASP selbst erledigt werden, wir wollen diese nicht im Service oder im Controller durchführen.
+
+Folgendes Schema zeigt den Nutzen unserer Idee:
+
+image::{root_dir}/request_flow_2053.jpg[]
+
+<1> Mit der klassischen integer ID gelangt _jeder_ Request zur Datenbank.
+<2> Besitzt unsere ID allerdings einen _Hashwert_, kann schon der Modelbinder durch den Parse Vorgang feststellen, dass diese manipuliert wurde.
+    Er lehnt den Request sofort ab.
+<3> Ist die codierte ID syntaktisch gültig, geht der Request weiter.
+    Nicht gefundene Ressourcen sind natürlich weiterhin möglich, aber nur wenn der Client die codierte ID weiß.
+
+== Die Id als eigener Typ
+
+In C# können wir - im Gegensatz zu Java oder anderen Programmiersprachen - eigene _Wertetypen_ anlegen.
+Diese werden wie _int_, _double_, etc. am Stack allokiert, können aber durch _Boxing_ auch am Heap angelegt werden.
+Die bekannteste struct im .NET Framework ist sicher _DateTime_.
+Structs werden angelegt, wenn ein Wert viele Methoden zur Bearbeitung anbieten soll.
+Andere Beispiele sind _Point_, _Position_, ...
+
+Da wir hier einen int Wert verwalten und viele Methoden für die Codierung, Decodierung, etc. anbieten wollen, eignet sich daher eine struct hervorragend dafür.
+Konkret wird die Codierung mit folgender Idee realisiert:
+
+* Mit HMACSHA256 generieren wir - unter Einbeziehung eines _Secrets_ - einen Hash.
+  Durch das Secret ist es dem Client nicht möglich, den Hashwert für eine ID selbst zu berechnen.
+* Ein SHA256 Wert hat 32 Bytes. Wenn wir den int Wert für die ID zusätzlich speichern, kommen wir auf _36 Bytes_ für ID + Hash.
+* Die Berechnung soll mit den neuen .NET Methoden, die _zero allocations_ am Heap benötigen, realisiert werden.
+  Dazu gehören die Typen _Span_, _ReadOnlySpan_ und entsprechende Methoden.
+
+Bei der _Decodierung_ berechnen wir den Hash aus den ersten 4 Bytes des codierten Wertes.
+Stimmen diese mit den restlichen Bytes des codierten Wertes überein, ist der Wert gültig.
+Einen Auszug der Implementierung zeigt dieses Listing.
+
+Wichtig sind die Methoden _Parse_ und _TryParse_.
+Wenn wir im Controller den Typ _Id_ als _routing parameter_ verwenden, wird der Modelbinder automatisch die Parse Methode aufrufen, um aus dem String im request body einen Wert vom Typ _Id_ zu erzeugen.
+
+.link:../Eventmanager/Eventmanager.Application/IdHasher/IdEncoder.cs[→ IdEncoder.cs (Vollständiger Code)]
+[source,csharp]
+----
+public readonly struct Id : IParsable<Id>, IEquatable<Id>
+{
+    public static byte[] Secret; // Wird global beim Start gesetzt
+    private const int _strLen = 48;
+    
+    public int Value { get; }
+    public Id(int value) => Value = value;
+    public bool HasValue => Value != 0;
+
+    // --- KERNLOGIK: CODIERUNG ---
+    public string EncodedValue => string.Create(_strLen, Value, (chars, val) =>
+    {
+        Span<byte> buffer = stackalloc byte[36]; // 4 (int) + 32 (hash)
+        BinaryPrimitives.WriteInt32LittleEndian(buffer, val);
+        HMACSHA256.HashData(Secret, buffer[..4], buffer[4..]);
+        Base64Url.EncodeToChars(buffer, chars);
+    });
+
+    // --- KERNLOGIK: DECODIERUNG ---
+    public static Id Decode(ReadOnlySpan<char> encodedValue)
+    {
+        if (encodedValue.Length != _strLen) return default;
+
+        Span<byte> buffer = stackalloc byte[36];
+        if (Base64Url.DecodeFromChars(encodedValue, buffer) != 36) return default;
+
+        Span<byte> computedHash = stackalloc byte[32];
+        HMACSHA256.HashData(Secret, buffer[..4], computedHash);
+
+        // Schutz vor Timing-Angriffen beim Hash-Vergleich
+        if (!CryptographicOperations.FixedTimeEquals(buffer[4..], computedHash))
+            return default;
+
+        return new Id(BinaryPrimitives.ReadInt32LittleEndian(buffer));
+    }
+
+    /* ... Implementierung von IParsable (Parse/TryParse), IEquatable, 
+           überschriebene Objektmethoden und Operatoren (==, !=, Casts) ... 
+           Details siehe verlinkte Source-Datei! ... */
+}
+----
+
+Damit Werte vom Typ _Id_ automatisch als String im JSON gesendet werden, müssen wir einen _Converter_ schreiben.
+Er schreibt einfach den Base64 codierten Wert in das JSON.
+Beim Lesen wandeln wir den codierten Wert in ein int zurück um.
+Ist der Wert 0, wissen wir, dass der codierte Wert ungültig ist.
+
+.link:../Eventmanager/Eventmanager.Application/IdHasher/IdConverter.cs[→ IdConverter.cs]
+[source,csharp]
+----
+public class IdConverter : JsonConverter<Id>
+{
+    public override Id Read(
+        ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.HasValueSequence)
+            return Id.Decode(reader.GetString() ?? string.Empty);
+
+        Span<char> chars = stackalloc char[reader.ValueSpan.Length];
+        int written = Encoding.UTF8.GetChars(reader.ValueSpan, chars);
+        return Id.Decode(chars[..written]);
+    }
+
+    public override void Write(Utf8JsonWriter writer, Id id, JsonSerializerOptions options) =>
+        writer.WriteStringValue(id.EncodedValue);
+}
+----
+
+Damit unser Converter funktioniert, müssen wir ihn in der _Program.cs_ - also in der Serverkonfiguration von ASP - registrieren:
+
+[source,csharp]
+----
+Id.Secret = Convert.FromBase64String(
+    builder.Configuration["IdEncoderSecret"] ?? throw new Exception("Missing IdEncoderSecret."));
+builder.Services.AddControllers()
+    .AddJsonOptions(opt => opt.JsonSerializerOptions.Converters.Add(new IdConverter()));
+----
+
+Das _Secret_ wird als Base64 codierter Wert in der Datei _appsettings.json_ mit dem Key _IdEncoderSecret_ gespeichert oder als Umgebungsvariable bereitgestellt.
+
+== Verwendung im Controller
+
+Die DTO Klasse verwendet für den Id Wert statt einem _int_ Wert den Typ _Id_.
+
+[source,csharp]
+----
+public record GuestDto(Id Id, string Firstname, string Lastname, DateOnly BirthDate);
+----
+
+Der nachfolgende Controller zeigt die Verwendung des Typs _Id_.
+Wir können ihn einfach durch Projektion mit der Methode _Id.From()_ erzeugen.
+
+.link:../Eventmanager/Eventmanager.Api/Controllers/GuestsController.cs[→ GuestsController.cs]
+[source,csharp]
+----
+[Route("api/[controller]")]
+[ApiController]
+public class GuestsController(EventContext db) : ControllerBase 
+{
+    [HttpGet]
+    [ProducesResponseType<List<GuestDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<GuestDto>>> GetGuests()
+    {
+        var guests = await db.Guests
+            .Select(g => new GuestDto(
+                Id.From(g.Id), g.Firstname, g.Lastname, g.BirthDate))    // <1>
+            .ToListAsync();
+        return Ok(guests);
+    }
+
+    [HttpGet("{id}")]
+    [ProducesResponseType<GuestDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<GuestDto>> GetGuestById([FromRoute] Id id) // <2>
+    {
+        var guest = await db.Guests
+            .Where(g => g.Id == id.Value)
+            .Select(g => new GuestDto(
+                Id.From(g.Id), g.Firstname, g.Lastname, g.BirthDate))
+            .FirstOrDefaultAsync();
+
+        if (guest is null) return Problem("Guest not found.", statusCode: 404);
+        return Ok(guest);
+    }
+}
+----
+
+<1> Mit _Id.From()_ wird der int Wert der ID codiert.
+<2> Der Typ _Id_ kann auch als routing parameter verwendet werden.
+    Dafür haben wir die entsprechenden _Parse_ Methoden im Typ _Id_.
+
+Die Antwort auf den Request _GET /api/guests_ sieht dann so aus:
+
+[source,json]
+----
+[
+  {
+    "id": "AQAAAGyqe0X_6-HDRGFIqLGetSQ9hZgXV_EMPGF01KKfYwr9",
+    "firstname": "Estelle",
+    "lastname": "Franzis",
+    "birthDate": "2000-05-05",
+    "links": {}
+  }
+]
+----
+
+Senden wir den Request _GET /api/guests/AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw0KRdVRr_, wird dieser verstanden und liefert die Daten des Gastes mit der ID 1:
+
+[source,json]
+----
+{
+  "id": "AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw0KRdVRr",
+  "firstname": "Rasmus",
+  "lastname": "Dippl",
+  "birthDate": "2003-04-27",
+  "links": {}
+}
+----
+
+== Gesamtüberblick
+
+Die beteiligten Komponenten werden in dieser Grafik dargestellt:
+
+image::{root_dir}/id_encoder_1724.jpg[]
+
+=== Kritische Betrachtungen
+
+Das Codieren der ID ersetzt nicht das Prüfen des Userrechte auf diese Ressource!
+Gleiche ID Werte werden immer auf gleiche codierte Werte abgebildet.
+So steht z. B. _AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw0KRdVRr_ immer für den Wert 1.
+Diese Technik verhindert nur, dass ein Client Abfragen mit unbekannter ID an den Server senden kann.
+
+

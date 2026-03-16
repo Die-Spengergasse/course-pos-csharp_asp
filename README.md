@@ -28,6 +28,10 @@ Mit ○ gekennzeichnete Kapitel sind Erweiterungskapitel.
 - ○ [Mocking mit NSubstitute](./12_Mocking/README.adoc)
 - ○ [Das Repository Pattern](./13_Repository/README.adoc)
 
+### Erweiterte Techniken
+
+- ○ [Encoding von ID Werten](./20_Id_Encoder/README.adoc)
+
 ### Übungen
 
 - [Sprachwochenverwaltung (Services, Controller, Mocking; für HIF)](./Uebungen/01_Languageweek/README.adoc)

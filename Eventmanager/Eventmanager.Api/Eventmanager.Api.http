@@ -118,3 +118,7 @@ GET {{baseUrl}}/api/guests/AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw0KRdVRr
 GET {{baseUrl}}/api/guests/AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw1KRdVRr
 
 ###
+
+GET {{baseUrl}}/api/guests/encodedId
+
+###

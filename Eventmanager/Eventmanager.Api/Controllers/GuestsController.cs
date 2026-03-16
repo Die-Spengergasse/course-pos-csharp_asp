@@ -39,6 +39,16 @@ public class GuestsController(EventContext db) : ControllerBase   // Primary con
         return Ok(guests);
     }
 
+    [HttpGet("encodedId")]
+    [ProducesResponseType<List<GuestDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<GuestDto>>> GetGuestsWtihEncodedId()
+    {
+        var guests = await db.Guests
+            .Select(g => new GuestDto(Id.From(g.Id), g.Firstname, g.Lastname, g.BirthDate))
+            .ToListAsync();
+        return Ok(guests);
+    }
+
     [HttpGet("{id}")]
     [ProducesResponseType<GuestDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -46,7 +56,7 @@ public class GuestsController(EventContext db) : ControllerBase   // Primary con
     {
         var guest = await db.Guests
             .Where(g => g.Id == id.Value)
-            .Select(g => new GuestDto(new Id(g.Id), g.Firstname, g.Lastname, g.BirthDate))
+            .Select(g => new GuestDto(Id.From(g.Id), g.Firstname, g.Lastname, g.BirthDate))
             .FirstOrDefaultAsync();
 
         if (guest is null) return Problem("Guest not found.", statusCode: 404);
