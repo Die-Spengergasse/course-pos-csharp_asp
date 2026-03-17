@@ -5,6 +5,7 @@
 :hyphens:
 :figure-caption!:
 ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
 ifndef::env-github[:icons: font]
 ifdef::env-github[]
 :caution-caption: :fire:
@@ -92,7 +93,7 @@ Sie definiert das _Id_ Property.
 Das ist wichtig, damit wir bei den lesenden Methoden auf _Id_ zugreifen können.
 Die Modelklassen leiten sich dann von _Entity_ ab.
 
-.link:../Eventmanager/Eventmanager.Application/Model/Entity.cs[→ Entity.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Model/Entity.cs[→ Entity.cs]
 [source,csharp]
 ----
 public abstract class Entity
@@ -224,7 +225,7 @@ Damit auch der SQL Code entsprechend generiert werden kann, wird der _Query_ Met
 
 === Der gesamte Code und das Interface
 
-.link:../Eventmanager/Eventmanager.Application/Repositories/IRepository.cs[→ IRepository.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Repositories/IRepository.cs[→ IRepository.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Model;
@@ -253,7 +254,7 @@ namespace Eventmanager.Application.Repositories
 }
 ----
 
-.link:../Eventmanager/Eventmanager.Application/Repositories/Repository.cs[→ Repository.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Repositories/Repository.cs[→ Repository.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Model;
@@ -337,7 +338,7 @@ Nun kann jedes Service die Dependency _IRepository<Show>_ anfordern und bekommt 
 
 Möchten wir spezifischen Code implementieren, können wir natürlich das Repository als Basisklasse verwenden und davon ableiten:
 
-.link:../Eventmanager/Eventmanager.Application/Repositories/IContingentRepository.cs[→ IContingentRepository.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Repositories/IContingentRepository.cs[→ IContingentRepository.cs]
 [source,csharp]
 ----
 using Eventmanager.Model;
@@ -351,7 +352,7 @@ public interface IContingentRepository : IRepository<Contingent>
 }
 ----
 
-.link:../Eventmanager/Eventmanager.Application/Repositories/ContingentRepository.cs[→ ContingentRepository.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Repositories/ContingentRepository.cs[→ ContingentRepository.cs]
 [source,csharp]
 ----
 using Eventmanager.Model;
@@ -393,7 +394,7 @@ Es erbt von _Repository<Contingent>_ und hat daher alle oben beschriebenen Metho
 Natürlich kann auch _IRepository<Contingent>_ angefordert werden, falls es kein eigenes _ContingentRepository_ gibt.
 Achte auf die korrekte Registrierung im Serviceprovider in der _Program.cs_.
 
-.link:../Eventmanager/Eventmanager.Application/Services/EventServiceWithRepo.cs[→ EventServiceWithRepo.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Services/EventServiceWithRepo.cs[→ EventServiceWithRepo.cs]
 [source,csharp]
 ----
 public class EventServiceWithRepo(IContingentRepository contingentRepo, bool isDevelopment)
@@ -480,7 +481,7 @@ Mock	Bedeutung
 |===
 
 
-.link:../Eventmanager/Eventmanager.Test/EventServiceWithRepoTest.cs[→ EventServiceWithRepoTest.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Test/EventServiceWithRepoTest.cs[→ EventServiceWithRepoTest.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;

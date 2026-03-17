@@ -5,6 +5,7 @@
 :hyphens:
 :figure-caption!:
 ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
 ifndef::env-github[:icons: font]
 ifdef::env-github[]
 :caution-caption: :fire:
@@ -150,7 +151,7 @@ Die Businesslogik des Services kümmert uns nicht.
 Wir erstellen einfach eine Methode _CreateContingent_, die entweder einen Wert oder eine Fehlermeldung liefert.
 Damit wir bei den GET Endpunkten Daten im response body bekommen, erstellen wir einige (wenige) Musterdaten.
 
-.link:../Eventmanager/Eventmanager.Test/ContingentsControllerWithServiceMockTests.cs[→ Eventmanager.Test/ContingentsControllerWithServiceMockTests.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Test/ContingentsControllerWithServiceMockTests.cs[→ Eventmanager.Test/ContingentsControllerWithServiceMockTests.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;

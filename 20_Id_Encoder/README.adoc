@@ -5,6 +5,7 @@
 :hyphens:
 :figure-caption!:
 ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
 ifndef::env-github[:icons: font]
 ifdef::env-github[]
 :caution-caption: :fire:
@@ -65,7 +66,7 @@ Einen Auszug der Implementierung zeigt dieses Listing.
 Wichtig sind die Methoden _Parse_ und _TryParse_.
 Wenn wir im Controller den Typ _Id_ als _routing parameter_ verwenden, wird der Modelbinder automatisch die Parse Methode aufrufen, um aus dem String im request body einen Wert vom Typ _Id_ zu erzeugen.
 
-.link:../Eventmanager/Eventmanager.Application/IdHasher/IdEncoder.cs[→ IdEncoder.cs (Vollständiger Code)]
+.link:{github_url}/Eventmanager/Eventmanager.Application/IdHasher/IdEncoder.cs[→ IdEncoder.cs (Vollständiger Code)]
 [source,csharp]
 ----
 public readonly struct Id : IParsable<Id>, IEquatable<Id>
@@ -115,7 +116,7 @@ Er schreibt einfach den Base64 codierten Wert in das JSON.
 Beim Lesen wandeln wir den codierten Wert in ein int zurück um.
 Ist der Wert 0, wissen wir, dass der codierte Wert ungültig ist.
 
-.link:../Eventmanager/Eventmanager.Application/IdHasher/IdConverter.cs[→ IdConverter.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/IdHasher/IdConverter.cs[→ IdConverter.cs]
 [source,csharp]
 ----
 public class IdConverter : JsonConverter<Id>
@@ -160,7 +161,7 @@ public record GuestDto(Id Id, string Firstname, string Lastname, DateOnly BirthD
 Der nachfolgende Controller zeigt die Verwendung des Typs _Id_.
 Wir können ihn einfach durch Projektion mit der Methode _Id.From()_ erzeugen.
 
-.link:../Eventmanager/Eventmanager.Api/Controllers/GuestsController.cs[→ GuestsController.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Api/Controllers/GuestsController.cs[→ GuestsController.cs]
 [source,csharp]
 ----
 [Route("api/[controller]")]

@@ -5,6 +5,7 @@
 :hyphens:
 :figure-caption!:
 ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
 ifndef::env-github[:icons: font]
 ifdef::env-github[]
 :caution-caption: :fire:
@@ -199,7 +200,7 @@ Es werden Teilstrings verglichen (nicht case sensitive), d. h. _not found_ ist f
 Die folgende Klasse zeigt den Test des link:../Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ ContingentsControllers]
 mit Hilfe der Hilfsklasse link:../Eventmanager/Eventmanager.Test/TestWebApplicationFactory.cs[→ TestWebApplicationFactory].
 
-.link:../Eventmanager/Eventmanager.Test/ContingentsControllerTests.cs[→ Eventmanager.Test/ContingentsControllerTests.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Test/ContingentsControllerTests.cs[→ Eventmanager.Test/ContingentsControllerTests.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;

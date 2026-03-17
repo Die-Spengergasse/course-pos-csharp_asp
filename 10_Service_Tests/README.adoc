@@ -5,6 +5,7 @@
 :hyphens:
 :figure-caption!:
 ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
 ifndef::env-github[:icons: font]
 ifdef::env-github[]
 :caution-caption: :fire:
@@ -261,7 +262,7 @@ Braucht man z. B. einen _DateTime_ Wert als Parameter, muss man diesen als Strin
 Nun sieht unsere gesamte Testklasse so aus.
 Sie testet die Methoden _CreateContingent()_ und _UpdateContingent()_ mit 100% code coverage.
 
-.link:../Eventmanager/Eventmanager.Test/EventServiceWithInMemoryDbTests.cs[→ Eventmanager.Test/EventServiceWithInMemoryDbTests.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Test/EventServiceWithInMemoryDbTests.cs[→ Eventmanager.Test/EventServiceWithInMemoryDbTests.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;

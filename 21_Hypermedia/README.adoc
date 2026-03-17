@@ -1,0 +1,305 @@
+= Hypermedia und HATEOAS
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+== Das Prinzip von Hypermedia
+
+Ein wesentliches Merkmal einer ausgereiften REST-API (Richardson Maturity Model Level 3) ist die Verwendung von _Hypermedia as the Engine of Application State_ (HATEOAS). 
+Die Idee dahinter ist einfach: Eine API liefert nicht nur nackte Daten zurück, sondern reichert die Antworten mit Links an, die dem Client mitteilen, welche weiteren Aktionen (Zustandsübergänge) mit dieser Ressource aktuell möglich sind.
+
+=== Vorteile von Hypermedia
+
+Dies bringt entscheidende Vorteile für die Architektur von Client-Server-Anwendungen mit sich:
+
+* **Zentrale Geschäftslogik am Server:** Der Server generiert die weiteren Möglichkeiten (Links) in Abhängigkeit von internen Constraints und aktuellen Userrechten.
+* **Dumme Clients:** Ein Client, wie z. B. eine Single Page Application (SPA), muss diese komplexe Geschäftslogik nicht mehr selbst abbilden.
+Er verlässt sich rein auf die gelieferten Links.
+Ein Löschbutton in der UI wird beispielsweise nur dann gerendert und angezeigt, wenn der Server im JSON auch einen _delete_-Link für diese Ressource mitliefert.
+
+Die folgende Illustration zeigt die generierten Hypermedia Links in Abhängigkeit des Users:
+
+image::{root_dir}/illustration_0738.jpg[]
+
+
+== Der HAL-Standard und die Realität
+
+Um diese Links im JSON zu strukturieren, haben sich verschiedene Entwürfe etabliert.
+Einer der bekanntesten ist der _HAL (Hypertext Application Language)_ Standard.
+Dieser schlägt vor, Links in einem speziellen __links_-Objekt innerhalb der JSON-Antwort zu bündeln. 
+
+Es ist jedoch wichtig zu verstehen, dass es für das JSON keinen fixen, allgemein verbindlichen Aufbau gibt, der von allen Systemen zwingend genutzt werden muss.
+Wie Links benannt und strukturiert werden, obliegt letztlich dem API-Design der jeweiligen Anwendung. 
+
+Dazu hält Microsoft in den Best Practices für API-Design treffend fest:
+
+[quote, 'https://learn.microsoft.com/en-us/azure/architecture/best-practices/api-design[Microsoft Azure Architecture Center]']
+____
+There are no general-purpose standards that define how to model the HATEOAS principle.
+The examples in this section illustrate one possible, proprietary solution.
+____
+
+Um diesen fehlenden Standard zu veranschaulichen, lohnt sich ein Blick auf ein anderes Ökosystem: **Spring Boot (Java)**.
+Das Framework nutzt standardmäßig eine striktere Umsetzung des HAL-Standards.
+Ein dort generierter JSON-Auszug sieht beispielsweise so aus:
+
+[source,json]
+----
+{
+  "_links": {
+    "self": {
+      "href": "http://localhost:8080/spring-security-rest/api/customers/10A"
+    },
+    "allOrders": {
+      "href": "http://localhost:8080/spring-security-rest/api/customers/10A/orders"
+    }
+  }
+}
+----
+
+Im Gegensatz zu unserer späteren eigenen Implementierung (die z. B. die HTTP-Methode explizit als String mitliefert und ein einfaches _links_-Property verwendet), nutzt Spring Boot das Präfix __links_ und verzichtet standardmäßig auf die Angabe der HTTP-Methode, da HAL primär von _GET_-Requests als Standard-Navigation ausgeht.
+Dies verdeutlicht sehr gut, dass unterschiedliche Frameworks stark voneinander abweichende Ausprägungen von HATEOAS erzeugen.
+
+.Vergleich der Link-Strukturen
+[cols="1,2,2", options="header"]
+|===
+| Merkmal | Spring Boot (HAL-Standard) | Eigene Implementierung (ASP.NET Core)
+
+| **Container-Property**
+| __links_ (mit Unterstrich)
+| _links_ (ohne Unterstrich)
+
+| **HTTP-Methode**
+| Meist weggelassen (implizit _GET_ als Standard)
+| Explizit angegeben (z. B. _"method": "DELETE"_)
+
+| **Aufbau der Links**
+| Relationen als Key, Objekt mit _href_-Property
+| Relationen als Key, Objekt mit _href_ und _method_
+
+| **Fokus**
+| Strikte Einhaltung von Konventionen (HAL)
+| Pragmatismus, maßgeschneidert für moderne SPA-Frontends
+|===
+
+
+== Konkrete Implementierung in ASP.NET Core
+
+Um Hypermedia in unserem Eventmanager zu realisieren, benötigen wir zunächst Basisklassen, die unsere DTOs um eine Link-Auflistung erweitern.
+
+=== Basisklassen und DTOs
+
+Wir definieren einen Record für den eigentlichen Link (_HypermediaLink_) und eine abstrakte Basisklasse (_HypermediaDto_), von der unsere Rückgabe-DTOs erben können.
+Ein Dictionary speichert die verfügbaren Links.
+
+.link:{github_url}/Eventmanager/Eventmanager.Application/Hypermedia/HypermediaDto.cs[→ HypermediaDto.cs]
+[source,csharp]
+----
+public abstract record HypermediaDto
+{
+    private Dictionary<string, HypermediaLink> _links = new();
+
+    [JsonInclude]
+    public IReadOnlyDictionary<string, HypermediaLink> Links => _links.AsReadOnly();
+
+    internal void AddLinkInternal(string rel, HypermediaLink link)
+    {
+        _links[rel] = link;
+    }
+}
+----
+
+Unser DTO für den Gast erbt nun von dieser Klasse:
+
+.link:{github_url}/Eventmanager/Eventmanager.Application/Dtos/GuestDto.cs[→ GuestDto.cs]
+[source,csharp]
+----
+public record GuestDto(
+    Id Id,
+    string Firstname, string Lastname, DateOnly BirthDate) : HypermediaDto;
+----
+
+=== Einfaches Hinzufügen von Links via Extensions
+
+Damit wir die Links elegant in unseren LINQ-Queries anhängen können, schreiben wir uns Extension Methods.
+Ein wichtiges Detail hierbei ist der Parameter _useLink_.
+Ist dieser _false_, wird der Link _nicht_ hinzugefügt.
+Das ist der Schlüssel, um Rechte und Constraints direkt bei der Abfrage auszuwerten.
+
+.link:{github_url}/Eventmanager/Eventmanager.Application/Hypermedia/HypermediaExtensions.cs[→ HypermediaExtensions.cs (Auszug)]
+[source,csharp]
+----
+public static class HypermediaExtensions
+{
+    public static T AddGet<T>(
+      this T dto, string url, string rel, bool useLink = true)
+      where T : HypermediaDto
+        => dto.AddLink(url, rel, "GET", useLink);
+
+    public static T AddDelete<T>(
+      this T dto, string url, string rel, bool useLink = true)
+      where T : HypermediaDto
+        => dto.AddLink(url, rel, "DELETE", useLink);
+
+    public static T AddLink<T>(
+      this T dto, string url, string rel, string method, bool useLink = true)
+      where T : HypermediaDto
+    {
+        if (string.IsNullOrEmpty(url) || !useLink) return dto;
+
+        dto.AddLinkInternal(rel, new HypermediaLink(url, method));
+        return dto;
+    }
+}
+----
+
+=== Verwendung im Controller
+
+Im _GuestsController_ sehen wir nun das Zusammenspiel in der Praxis.
+Wir wollen Gästen, die bereits Tickets besitzen, keinen _delete_-Link mitgeben, da sie aufgrund der referenziellen Integrität (oder unserer Geschäftslogik) nicht gelöscht werden dürfen.
+
+.link:{github_url}/Eventmanager/Eventmanager.Api/Controllers/GuestsController.cs[→ GuestsController.cs]
+[source,csharp]
+----
+[HttpGet]
+[ProducesResponseType<List<GuestDto>>(StatusCodes.Status200OK)]
+public async Task<ActionResult<List<GuestDto>>> GetGuests(CancellationToken cancellationToken)
+{
+    var guests = (
+            await db.Guests
+                .Select(g => new { Guest = g, CanDelete = !g.Tickets.Any() })   // <1>
+                .ToListAsync(cancellationToken)
+        ).Select(g => new GuestDto(
+                Id.From(g.Guest.Id), g.Guest.Firstname,
+                g.Guest.Lastname, g.Guest.BirthDate)
+            .AddGet(
+              GenerateResourceLink(Id.From(g.Guest.Id)), "details")       // <2>
+            .AddDelete(
+              GenerateResourceLink(Id.From(g.Guest.Id)), "delete", g.CanDelete)) // <3>
+        .ToList();
+        
+    return Ok(guests);
+}
+----
+
+<1> Zunächst ermitteln wir schon auf Datenbankebene, ob der Gast Tickets besitzt (_CanDelete_).
+Dies verhindert eine ineffiziente _Client Evaluation_ im RAM.
+<2> Jeder Gast bekommt einen Link zur Detailansicht (_GET /api/guests/{id}_).
+<3> Der _DELETE_-Link wird nur hinzugefügt, wenn das Constraint _g.CanDelete_ den Wert _true_ besitzt.
+
+[NOTE]
+====
+Die Logik, wann ein _DELETE_ Link sichtbar ist, wurde hier zur besseren Veranschaulichung im Controller abgebildet.
+Natürlich kann auch eine Serviceklasse die Liste von _GuestDto_ mit entsprechenden Links, die der Business Logik entsprechen, zurückgeben.
+====
+
+Das generierte JSON einer solchen Antwort sieht für den Client dann so aus:
+
+[source,json]
+----
+[
+  {
+    "id": "AQAAAGyqe0X_6-HDRGFIqLGetSQ9hZgXV_EMPGF01KKfYwr9",
+    "firstname": "Estelle",
+    "lastname": "Franzis",
+    "birthDate": "2000-05-05",
+    "links": {
+      "details": {
+        "href": "http://localhost:5080/api/Guests/AQAAAGyqe0X_6-HDRGFIqLGetSQ9hZgXV_EMPGF01KKfYwr9",
+        "method": "GET"
+      },
+      "delete": {
+        "href": "http://localhost:5080/api/Guests/AQAAAGyqe0X_6-HDRGFIqLGetSQ9hZgXV_EMPGF01KKfYwr9",
+        "method": "DELETE"
+      }
+    }
+  },
+  {
+    "id": "AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw0KRdVRr",
+    "firstname": "Rasmus",
+    "lastname": "Dippl",
+    "birthDate": "2003-04-27",
+    "links": {
+      "details": {
+        "href": "http://localhost:5080/api/Guests/AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw0KRdVRr",
+        "method": "GET"
+      },
+      "delete": {
+        "href": "http://localhost:5080/api/Guests/AgAAAGJ1xTf-ksLP5BI_kFQzKfou1osvxnXUnmxEw0KRdVRr",
+        "method": "DELETE"
+      }
+    }
+  }
+]
+----
+
+Der Client erkennt sofort, welche Aktionen erlaubt sind: Sowohl _Estelle_ als auch _Rasmus_ dürfen in diesem Zustand gelöscht werden (beide haben einen _delete_-Link), weshalb die SPA bei beiden den Löschbutton einblendet.
+Sobald ein Gast jedoch gebuchte Tickets besitzt, liefert der Server durch unsere Logik (_CanDelete = false_) keinen _delete_-Link mehr zurück, woraufhin die SPA den Löschbutton für diesen Eintrag ausblendet oder deaktiviert.
+
+== Einsatz in einer SPA (Next.js)
+
+Um den wahren Nutzen unseres HATEOAS-Ansatzes zu demonstrieren, werfen wir einen Blick in das Frontend.
+In einer React/Next.js-Anwendung müssen wir die Geschäftslogik ("Darf ein Gast gelöscht werden?") nicht mehr duplizieren.
+Wir verlassen uns vollständig auf die Präsenz der Links im JSON.
+
+Das folgende Beispiel zeigt eine Komponente, die einen einzelnen Gast in einer Liste darstellt.
+Der Löschbutton wird nur gerendert, wenn der Server den entsprechenden Link mitgeschickt hat.
+Ist der Link vorhanden, wird die _href_ (also die Ziel-URL für den DELETE-Request) an eine separate Lösch-Komponente (_DeleteGuestButton_) übergeben.
+
+[source,tsx]
+----
+import React from 'react';
+import DeleteGuestButton from './DeleteGuestButton'; // Komponente, die den eigentlichen DELETE-Request ausführt
+
+interface HypermediaLink {
+  href: string;
+  method: string;
+};
+
+interface Guest {
+  id: string;
+  firstname: string;
+  lastname: string;
+  birthDate: string;
+  links: {
+    details?: HypermediaLink;
+    delete?: HypermediaLink;
+  };
+};
+
+export default function GuestListItem({ guest }: { guest: Guest }) {
+  return (
+    <div>
+      <h3>{guest.firstname} {guest.lastname}</h3>
+      <p>Geburtsdatum: {guest.birthDate}</p>
+
+      <div>
+        {/* Details-Link immer rendern, falls der Server ihn liefert */}
+        {guest.links.details && (
+          <a href={guest.links.details.href}>Details</a>
+        )}
+
+        {/* HATEOAS in Action: Lösch-Button nur rendern, wenn der Server den Link anbietet */}
+        {guest.links.delete && (
+          <DeleteGuestButton deleteUrl={guest.links.delete.href} 
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+----
+
+Dieses einfache Muster entkoppelt das Frontend von komplexen Erlaubnis-Regeln und macht die Client-Architektur deutlich robuster gegenüber serverseitigen Regeländerungen.

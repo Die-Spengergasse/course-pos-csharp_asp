@@ -31,6 +31,7 @@ Mit ○ gekennzeichnete Kapitel sind Erweiterungskapitel.
 ### Erweiterte Techniken
 
 - ○ [Encoding von ID Werten](./20_Id_Encoder/README.adoc)
+- ○ [HATEOAS](./21_Hypermedia/README.adoc)
 
 ### Übungen
 

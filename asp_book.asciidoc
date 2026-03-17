@@ -18,6 +18,8 @@ ifdef::env-github[]
 :warning-caption: :warning:
 endif::[]
 
+:github_url: https://github.com/Die-Spengergasse/course-pos-csharp_asp/blob/main
+
 :leveloffset: 1
 
 toc::[]
@@ -50,6 +52,9 @@ include::./{root_dir}/README.adoc[tag=!pdf_exclude]
 include::./{root_dir}/README.adoc[tag=!pdf_exclude]
 
 :root_dir: 20_Id_Encoder
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
+:root_dir: 21_Hypermedia
 include::./{root_dir}/README.adoc[tag=!pdf_exclude]
 
 :leveloffset: 0

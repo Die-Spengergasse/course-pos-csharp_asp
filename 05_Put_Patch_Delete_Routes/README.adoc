@@ -5,6 +5,7 @@
 :hyphens:
 :figure-caption!:
 ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
 ifndef::env-github[:icons: font]
 ifdef::env-github[]
 :caution-caption: :fire:
@@ -62,7 +63,7 @@ Neu ist das Property _Id_.
 Da wir eine bestehende Ressource aktualisieren, brauchen wir eine eindeutige Identifikation.
 Das Property _Version_ wird später besprochen. Es verhindert, dass Änderungen anderer User überschrieben werden.
 
-.link:../Eventmanager/Eventmanager.Application/Commands/UpdateContingentCmd.cs[→ Eventmanager.Application/Commands/UpdateContingentCmd.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Commands/UpdateContingentCmd.cs[→ Eventmanager.Application/Commands/UpdateContingentCmd.cs]
 [source,csharp]
 ----
 using Eventmanager.Model;
@@ -97,7 +98,7 @@ public record UpdateContingentCmd(
 
 Das Service wird durch eine Methode _UpdateContingent_ ergänzt.
 
-.link:../Eventmanager/Eventmanager.Application/Services/EventService.cs[→ Eventmanager.Application/Services/EventService.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Services/EventService.cs[→ Eventmanager.Application/Services/EventService.cs]
 [source,csharp]
 ----
 public class EventService(EventContext db, bool isDevelopment, TimeProvider timeProvider) : IEventService
@@ -156,7 +157,7 @@ Wenn die ID nicht in der Datenbank gefunden wurde, soll unser Controller den HTT
 Bei anderen Fehlern soll HTTP 400 bad request zurückgegeben werden.
 Damit der Controller die Exceptions unterscheiden kann, legen wir einfach eine Klasse _EventServiceNotFoundException_ an, die von _EventServiceException_ erbt.
 
-.link:../Eventmanager/Eventmanager.Application/Services/EventServiceNotFoundException.cs[→ Eventmanager.Application/Services/EventServiceNotFoundException.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Services/EventServiceNotFoundException.cs[→ Eventmanager.Application/Services/EventServiceNotFoundException.cs]
 [source,csharp]
 ----
 [Serializable]
@@ -265,7 +266,7 @@ Er ruft einfach die Servicemethode auf und liefert je nach Fehler die entspreche
 Im Erfolgsfall wird _204 no content_ geliefert, da der Client schon alle Informationen über die Ressource besitzt.
 Deswegen muss der Server keine Daten zurückliefern.
 
-.link:../Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ Eventmanager.Api/Controllers/ContingentsController.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ Eventmanager.Api/Controllers/ContingentsController.cs]
 [source,csharp]
 ----
 [Route("api/[controller]")]
@@ -308,7 +309,7 @@ Er soll den Wert in _AvailableTickets_ aktualisieren.
 
 Wie vorher erstellen wir zuerst ein command object, das die ID der Resource und den neuen Wert beinhaltet:
 
-.link:../Eventmanager/Eventmanager.Application/Commands/UpdateContingentAvailableTicketsCmd.cs[→ Eventmanager.Application/Commands/UpdateContingentAvailableTicketsCmd.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Commands/UpdateContingentAvailableTicketsCmd.cs[→ Eventmanager.Application/Commands/UpdateContingentAvailableTicketsCmd.cs]
 [source,csharp]
 ----
 public record UpdateContingentAvailableTicketsCmd(
@@ -324,7 +325,7 @@ So darf der neue Wert nicht unter den schon verkauften Tickets liegen.
 Natürlich bekommt der Datensatz auch eine neue Version.
 Da wir das Verhalten "last one wins" akzeptieren, prüfen wir allerdings nicht im Code die Version.
 
-.link:../Eventmanager/Eventmanager.Application/Services/EventService.cs[→ Eventmanager.Application/Services/EventService.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Services/EventService.cs[→ Eventmanager.Application/Services/EventService.cs]
 [source,csharp]
 ----
 public async Task UpdateAvailableTickets(UpdateContingentAvailableTicketsCmd cmd)
@@ -345,7 +346,7 @@ public async Task UpdateAvailableTickets(UpdateContingentAvailableTicketsCmd cmd
 
 Im _ContingentsController_ ist diese Methode mit dem entsprechenden _HttpPatch_ Attribut implementiert:
 
-.link:../Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ Eventmanager.Api/Controllers/ContingentsController.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ Eventmanager.Api/Controllers/ContingentsController.cs]
 [source,csharp]
 ----
 [Route("api/[controller]")]
@@ -387,7 +388,7 @@ Unsere Business Logik sieht in diesem Fall einen Abbruch vor.
 Ansonsten ist die Servicemethode sehr einfach aufgebaut, da kein command object benötigt wird.
 Wir brauchen nur die ID als eindeutige Identifizierung.
 
-.link:../Eventmanager/Eventmanager.Application/Services/EventService.cs[→ Eventmanager.Application/Services/EventService.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Services/EventService.cs[→ Eventmanager.Application/Services/EventService.cs]
 [source,csharp]
 ----
 public async Task DeleteContingent(int id)

@@ -5,6 +5,7 @@
 :hyphens:
 :figure-caption!:
 ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
 ifndef::env-github[:icons: font]
 ifdef::env-github[]
 :caution-caption: :fire:
@@ -38,7 +39,7 @@ Bei größeren Projekten empfiehlt sich das Anlegen mehrerer Serviceklassen, die
 Das kann z. B. ein _TicketService_, ein _CustomerService_, ein _InvoiceService_, etc. sein.
 Wir legen das Service im _Application Projekt_ an, da es keine Abhängigkeiten zu ASP.NET hat und auch keine haben soll.
 
-.link:../Eventmanager/Eventmanager.Application/Services/EventService.cs[→ Eventmanager.Application/Services/EventService.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Services/EventService.cs[→ Eventmanager.Application/Services/EventService.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;
@@ -125,7 +126,7 @@ Unser Controller sollte nicht eine konkrete Implementierung des Services anforde
 Es beinhaltet alle _public_ Methoden und Properties.
 Später können wir durch Mocking Frameworks eine eigene Implementierung zum Testen der Controller erzeugen.
 
-.link:../Eventmanager/Eventmanager.Application/Services/IEventService.cs[→ Eventmanager.Application/Services/IEventService.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Services/IEventService.cs[→ Eventmanager.Application/Services/IEventService.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;
@@ -188,7 +189,7 @@ Beachte, dass _DateTime_ auch ein Wertetyp ist und den 1.1.0001 als Wert annimmt
 
 Nun wollen wir für den Parameter der Methode _CreateContingent_ ein command object mit dem Namen _CreateContingentCmd_ erstellen:
 
-.link:../Eventmanager/Eventmanager.Application/Commands/CreateContingentCmd.cs[→ Eventmanager.Application/Commands/CreateContingentCmd.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Application/Commands/CreateContingentCmd.cs[→ Eventmanager.Application/Commands/CreateContingentCmd.cs]
 [source,csharp]
 ----
 using Eventmanager.Model;
@@ -253,7 +254,7 @@ Singleton Service	Es wird zu Programmstart eine Instanz erzeugt, diese wird wäh
 Wir werden immer ein _Scoped Service_ anlegen, da unsere Services schnell instanziert werden können und wir keine Seiteneffekte berücksichtigen müssen.
 Für die Registrierung gibt es die Methode _AddScoped_ des Service Providers, die wir in der Datei _Program.cs_ verwenden.
 
-.link:../Eventmanager/Eventmanager.Api/Program.cs[→ Eventmanager.Api/Program.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Api/Program.cs[→ Eventmanager.Api/Program.cs]
 [source,csharp]
 ----
 public class Program
@@ -307,7 +308,7 @@ ASP wird - wie vorher definiert - das _EventService_ mit den richtigen Parameter
 Wir haben keine Dependency zur Datenbank durch den _EventContext_, da dadurch Prüflogik im Service umgangen werden könnte und das clean code Schema durchbrochen wird.
 ====
 
-.link:../Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ Eventmanager.Api/Controllers/ContingentsController.cs]
+.link:{github_url}/Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ Eventmanager.Api/Controllers/ContingentsController.cs]
 [source,csharp]
 ----
 using Eventmanager.Application.Commands;
@@ -387,7 +388,7 @@ Der dritte Parameter ist ein beliebiges Objekt, das an den Client zurückgesende
 
 ==== Test mit dem HTTP File
 
-.link:../Eventmanager/Eventmanager.Api/Eventmanager.Api.http[→ Eventmanager.Api/Eventmanager.Api.http]
+.link:{github_url}/Eventmanager/Eventmanager.Api/Eventmanager.Api.http[→ Eventmanager.Api/Eventmanager.Api.http]
 ----
 @baseUrl = http://localhost:5080
 
