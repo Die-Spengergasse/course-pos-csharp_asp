@@ -269,6 +269,7 @@ Unter _View_ -> _Other Windows_ -> _Endpoints Explorer_ können diese Einträge 
 
 *Weitere Informationen:* https://learn.microsoft.com/en-us/aspnet/core/tutorials/first-web-api
 // tag::pdf_exclude[]
+
 == Übung
 
 Erstelle wie im Kapitel _"Die erste ASP.NET Core App"_ eine .NET 10 Application und ein .NET 10 API Projekt.
