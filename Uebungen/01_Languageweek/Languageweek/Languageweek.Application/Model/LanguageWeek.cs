@@ -8,7 +8,9 @@ namespace Languageweek.Application.Model
     {
         private LanguageWeek() { }
         [SetsRequiredMembers]
-        public LanguageWeek(Schoolclass schoolclass, Destination destination, DateOnly from, DateOnly to, Teacher teacher, decimal pricePerPerson)
+        public LanguageWeek(
+            Schoolclass schoolclass, Destination destination, DateOnly from, DateOnly to,
+            Teacher teacher, decimal pricePerPerson, Teacher? supportTeacher = null)
         {
             Schoolclass = schoolclass;
             Destination = destination;
@@ -16,6 +18,7 @@ namespace Languageweek.Application.Model
             To = to;
             Teacher = teacher;
             PricePerPerson = pricePerPerson;
+            SupportTeacher = supportTeacher;
         }
         public required Schoolclass Schoolclass { get; set; }
         public required Destination Destination { get; set; }

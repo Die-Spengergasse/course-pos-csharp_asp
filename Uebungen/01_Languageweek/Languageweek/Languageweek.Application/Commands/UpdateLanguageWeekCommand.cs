@@ -9,5 +9,6 @@ public record UpdateLanguageWeekCommand(
     DateOnly From,
     DateOnly To,
     int TeacherId,
-    decimal PricePerPerson
+    decimal PricePerPerson,
+    int? SupportTeacherId
 );

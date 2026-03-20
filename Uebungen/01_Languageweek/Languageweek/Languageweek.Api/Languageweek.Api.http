@@ -1,81 +1,67 @@
-@baseUrl = http://localhost:5080/api/languageweeks
+@HostAddress = http://localhost:5080
 
-### ==============================================================================
-### 1. GET - ABFRAGE ALLER SPRACHWOCHEN
-### ==============================================================================
-
-### Erfolgsfall (200 OK): Liefert alle Sprachwochen mit leerem Array für Registrations
-GET {{baseUrl}}
+### HTTP 400: The schoolclass field is required.
+GET {{HostAddress}}/api/registrations
 Accept: application/json
 
-### Erfolgsfall (200 OK): Liefert alle Sprachwochen mit befülltem Array für Registrations
-GET {{baseUrl}}?includeRegistrations=true
+### HTTP 200 OK
+GET {{HostAddress}}/api/registrations?schoolclass=4AHIF
 Accept: application/json
 
-
-### ==============================================================================
-### 2. GET - ABFRAGE EINER SPRACHWOCHE
-### ==============================================================================
-
-### Erfolgsfall (200 OK): Lade Sprachwoche 1 (4AHIF, London)
-GET {{baseUrl}}/1
+### HTTP 200 OK: leeres Array
+GET {{HostAddress}}/api/registrations?schoolclass=6AAIF
 Accept: application/json
 
-### ==============================================================================
-### 3. POST - NEUE SPRACHWOCHE ERSTELLEN (CreateLanguageWeekAsync)
-### ==============================================================================
+### HTTP 200 OK
+GET {{HostAddress}}/api/registrations/1
+Accept: application/json
 
-### Erfolgsfall (201 Created): Neue Sprachwoche für 4BHIF (Class ID 2) erstellen.
-# Laut Seed hat die 4BHIF noch keine Sprachwoche.
-POST {{baseUrl}}
+### HTTP 404: Registration with ID 999 not found.
+GET {{HostAddress}}/api/registrations/999
+Accept: application/json
+
+### HTTP 201 Created
+POST {{HostAddress}}/api/registrations
 Content-Type: application/json
 
 {
-  "schoolclassId": 2,
-  "destinationId": 3, 
-  "from": "2036-07-01",
-  "to": "2036-07-08",
-  "teacherId": 4, 
-  "pricePerPerson": 950.00
+  "languageweekId": 4,
+  "studentId": 10,
+  "registerDate": "2036-03-20T10:00:00Z"
 }
 
-### ==============================================================================
-### 4. PUT - SPRACHWOCHE AKTUALISIEREN (UpdateLanguageWeekAsync)
-### ==============================================================================
-
-### Erfolgsfall (204 NoContent): Sprachwoche 1 aktualisieren.
-# Ändert das Reiseziel auf 2 (Dublin) und den Preis auf 850.
-PUT {{baseUrl}}/1
+### HTTP 400: Languageweek id not found
+POST {{HostAddress}}/api/registrations
 Content-Type: application/json
+
 {
-  "id": 1,
-  "schoolclassId": 1,
-  "destinationId": 2, 
-  "from": "2026-07-09",
-  "to": "2026-07-14",
-  "teacherId": 1, 
-  "pricePerPerson": 850.00
+  "languageweekId": 999,
+  "studentId": 10,
+  "registerDate": "2026-03-20T10:00:00Z"
 }
 
-### ==============================================================================
-### 5. PATCH - PREIS AKTUALISIEREN (UpdateLanguageWeekPriceAsync)
-### ==============================================================================
-
-### Erfolgsfall (204 NoContent): Nur den Preis von Sprachwoche 2 anpassen.
-PATCH {{baseUrl}}/2/price
+### HTTP 400: Student id not found.
+POST {{HostAddress}}/api/registrations
 Content-Type: application/json
+
 {
-  "id": 2,
-  "pricePerPerson": 1250.00
+  "languageweekId": 4,
+  "studentId": 999,
+  "registerDate": "2026-03-20T10:00:00Z"
 }
 
-### ==============================================================================
-### 6. DELETE - SPRACHWOCHE LÖSCHEN (DeleteLanguageWeekAsync)
-### ==============================================================================
+### HTTP 400: Registration date is in the past.
+POST {{HostAddress}}/api/registrations
+Content-Type: application/json
 
-### Erfolgsfall (204 NoContent): Löschen erzwingen (forceDelete=true).
-# Löscht die Sprachwoche und kaskadiert das Löschen der Registrierungen.
-DELETE {{baseUrl}}/3?forceDelete=true
-Accept: application/json
+{
+  "languageweekId": 4,
+  "studentId": 10,
+  "registerDate": "2026-01-20T10:00:00Z"
+}
 
+### DELETE eine Registrierung (Erfolgsfall: Id 2 existiert im Seed)
+DELETE {{HostAddress}}/api/registrations/2
 
+### HTTP 404: Registration id not found.
+DELETE {{HostAddress}}/api/registrations/999

@@ -5,203 +5,177 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Languageweek.Application.Infrastructure
+namespace Languageweek.Application.Infrastructure;
+
+public class LanguageweekContext : DbContext
 {
-    public class LanguageweekContext : DbContext
+    public DbSet<Student> Students => Set<Student>();
+    public DbSet<Teacher> Teachers => Set<Teacher>();
+    public DbSet<Schoolclass> Schoolclasses => Set<Schoolclass>();
+    public DbSet<Model.LanguageWeek> Languageweeks => Set<LanguageWeek>();
+    public DbSet<Registration> Registrations => Set<Registration>();
+    public DbSet<Destination> Destinations => Set<Destination>();
+
+    public LanguageweekContext(DbContextOptions options) : base(options)
+    { }
+
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        public DbSet<Student> Students => Set<Student>();
-        public DbSet<Teacher> Teachers => Set<Teacher>();
-        public DbSet<Schoolclass> Schoolclasses => Set<Schoolclass>();
-        public DbSet<Model.LanguageWeek> Languageweeks => Set<LanguageWeek>();
-        public DbSet<Registration> Registrations => Set<Registration>();
-        public DbSet<Destination> Destinations => Set<Destination>();
+        modelBuilder.Entity<LanguageWeek>().HasOne(l => l.Teacher)
+            .WithMany(t => t.LanguageweekTeachers);
+        modelBuilder.Entity<LanguageWeek>().HasOne(l => l.SupportTeacher)
+            .WithMany(t => t.LanguageweekSupportTeachers);
+        modelBuilder.Entity<Student>().Property(s => s.Gender).HasConversion<string>();
+        modelBuilder.Entity<Teacher>().Property(t => t.Gender).HasConversion<string>();
 
-        public LanguageweekContext(DbContextOptions options) : base(options)
-        { }
-
-        public List<Teacher> GetTeachersWithMinCountOfParticipations(int count)
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            // TODO: Add your implementation
-            throw new NotImplementedException();
-        }
+            // Tabellennamen basieren auf Entity-Namen (nicht DbSet) und starten klein
+            var clrName = entityType.ClrType.Name;
+            var tableName = char.ToLowerInvariant(clrName[0]) + clrName[1..];
+            entityType.SetTableName(tableName);
 
-        public List<Schoolclass> GetClassesWithoutLanguageWeek()
-        {
-            // TODO: Add your implementation
-            throw new NotImplementedException();
-        }
-        public record SchoolclassStatistics(int Id, string Shortname, int MaleCount, int FemaleCount);
-        /// </summary>
-        public List<SchoolclassStatistics> CalcSchoolclassStatistics()
-        {
-            // TODO: Add your implementation
-            throw new NotImplementedException();
-        }
-
-        public record LanguageWeekRegistrationRate(
-            int Id, DateOnly From, DateOnly To, decimal TotalPrice,
-            int DestinationId, string DestinationCity, string DestinationCountry,
-            int SchoolclassId, string SchoolclassShortname, decimal Percentage);
-        public List<LanguageWeekRegistrationRate> CalcRegistrationRates()
-        {
-            // TODO: Add your implementation
-            throw new NotImplementedException();
-        }
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            modelBuilder.Entity<LanguageWeek>().HasOne(l => l.Teacher)
-                .WithMany(t => t.LanguageweekTeachers);
-            modelBuilder.Entity<LanguageWeek>().HasOne(l => l.SupportTeacher)
-                .WithMany(t => t.LanguageweekSupportTeachers);
-            modelBuilder.Entity<Student>().Property(s => s.Gender).HasConversion<string>();
-            modelBuilder.Entity<Teacher>().Property(t => t.Gender).HasConversion<string>();
-
-            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            foreach (var property in entityType.GetProperties())
             {
-                // Tabellennamen basieren auf Entity-Namen (nicht DbSet) und starten klein
-                var clrName = entityType.ClrType.Name;
-                var tableName = char.ToLowerInvariant(clrName[0]) + clrName[1..];
-                entityType.SetTableName(tableName);
+                var propName = property.Name;
+                // Spaltenname: Nur erster Buchstabe klein
+                property.SetColumnName(char.ToLowerInvariant(propName[0]) + propName[1..]);
 
-                foreach (var property in entityType.GetProperties())
-                {
-                    var propName = property.Name;
-                    // Spaltenname: Nur erster Buchstabe klein
-                    property.SetColumnName(char.ToLowerInvariant(propName[0]) + propName[1..]);
+                // Standardkonfigurationen
+                if (property.ClrType == typeof(string) && property.GetMaxLength() is null)
+                    property.SetMaxLength(255);
 
-                    // Standardkonfigurationen
-                    if (property.ClrType == typeof(string) && property.GetMaxLength() is null)
-                        property.SetMaxLength(255);
-
-                    if (property.ClrType == typeof(DateTime)) property.SetPrecision(3);
-                    if (property.ClrType == typeof(DateTime?)) property.SetPrecision(3);
-                }
-
-                // FK-Verhalten
-                foreach (var fk in entityType.GetForeignKeys())
-                    fk.DeleteBehavior = DeleteBehavior.Restrict;
+                if (property.ClrType == typeof(DateTime)) property.SetPrecision(3);
+                if (property.ClrType == typeof(DateTime?)) property.SetPrecision(3);
             }
+
+            // FK-Verhalten
+            foreach (var fk in entityType.GetForeignKeys())
+                fk.DeleteBehavior = DeleteBehavior.Restrict;
         }
+    }
 
-        public void Seed()
+    public void Seed()
+    {
+        Randomizer.Seed = new Random(1832);
+        var minDate = new DateTime(2025, 9, 1);
+        var maxDate = new DateTime(2026, 6, 1);
+        var faker = new Faker();
+
+        // Generate a list of 5 Teachers without Bogus
+        var teachers = GenerateDistinct(f =>
         {
-            Randomizer.Seed = new Random(1832);
-            var minDate = new DateTime(2025, 9, 1);
-            var maxDate = new DateTime(2026, 6, 1);
-            var faker = new Faker();
+            var lastname = f.Name.LastName();
+            var firstname = f.Name.FirstName();
+            var shortname = $"{lastname[..2]}{firstname[0]}".ToUpper();
+            return new Teacher(
+                shortname, firstname, lastname,
+                $"{lastname.ToLower()}@spengergasse.at", f.Random.Enum<Gender>());
+        }, 10, t => t.Shortname);
 
-            // Generate a list of 5 Teachers without Bogus
-            var teachers = new List<Teacher>
-            {
-                new Teacher("WIS", "Stefanie", "Williams", "williams@spengergasse.at", Gender.Female),
-                new Teacher("JOS", "Susan", "Johnson", "johnson@spengergasse.at", Gender.Female),
-                new Teacher("BRM", "Michael", "Brown", "brown@spengergasse.at", Gender.Male),
-                new Teacher("SMM", "Martin", "Smith", "smith@spengergasse.at", Gender.Male),
-                new Teacher("JOM", "Manfred", "Jones", "jones@spengergasse.at", Gender.Male),
-            };
-            Teachers.AddRange(teachers);
-            SaveChanges();
+        List<Schoolclass> schoolclasses =
+        [
+            new Schoolclass("4AHIF", "HIF"),
+            new Schoolclass("4BHIF", "HIF"),
+            new Schoolclass("4CHIF", "HIF"),
+            new Schoolclass("4AHBGM", "HBGM"),
+            new Schoolclass("6AAIF", "IF"),
+        ];
+        Schoolclasses.AddRange(schoolclasses);
+        SaveChanges();
 
-            var schoolclasses = new List<Schoolclass>
-            {
-                new Schoolclass("4AHIF", "HIF"),
-                new Schoolclass("4BHIF", "HIF"),
-                new Schoolclass("4CHIF", "HIF"),
-                new Schoolclass("4AHBGM", "HBGM")
-            };
-            Schoolclasses.AddRange(schoolclasses);
-            SaveChanges();
+        List<Destination> destinations =
+        [
+            new Destination("London", "Großbritannien"),
+            new Destination("Dublin", "Irland"),
+            new Destination("Valetta", "Malta"),
+            new Destination("Edinburgh", "Großbritannien"),
+            new Destination("Galway", "Irland")
+        ];
+        Destinations.AddRange(destinations);
+        SaveChanges();
 
-            var destinations = new List<Destination>
-            {
-                new Destination("London", "Großbritannien"),
-                new Destination("Dublin", "Irland"),
-                new Destination("Valetta", "Malta"),
-                new Destination("Edinburgh", "Großbritannien"),
-                new Destination("Galway", "Irland")
-            };
-            Destinations.AddRange(destinations);
-            SaveChanges();
+        var onlyMaleClasses = new Dictionary<string, bool>
+        {
+            { "4AHIF", false },
+            { "4BHIF", true },
+            { "4AHBGM", false },
+            { "4CHIF", true },
+            { "6AAIF", true },
+        };
 
-            var onlyMaleClasses = new Dictionary<string, bool>
-            {
-                { "4AHIF", false },
-                { "4BHIF", true },
-                { "4CHIF", true },
-                { "4AHBGM", false }
-            };
+        var students = GenerateDistinct(f =>
+        {
+            var schoolclass = f.Random.ListItem(schoolclasses);
+            var onlyMaleClass = onlyMaleClasses[schoolclass.Shortname];
+            var gender = onlyMaleClass ? Gender.Male : f.Random.Enum<Gender>();
+            var lastname = f.Name.LastName();
+            var firstname = f.Name.FirstName(gender == Gender.Male
+                ? Bogus.DataSets.Name.Gender.Male
+                : Bogus.DataSets.Name.Gender.Female);
+            var email = $"{firstname.ToLower()}.{lastname.ToLower()}@spengergasse.at";
+            return new Student(
+                firstname, lastname, email, schoolclass,
+                gender,
+                f.Date.BetweenDateOnly(new DateOnly(2008, 1, 1), new DateOnly(2009, 1, 1)));
+        }, schoolclasses.Count * 25, s => s.Email)
+        .GroupBy(s => s.Schoolclass)
+        .ToDictionary(g => g.Key, g => g.ToList());
 
-            var students = new Faker<Student>("de").CustomInstantiator(f =>
-            {
-                var schoolclass = f.Random.ListItem(schoolclasses);
-                var onlyMaleClass = onlyMaleClasses[schoolclass.Shortname];
-                var gender = onlyMaleClass ? Gender.Male : f.Random.Enum<Gender>();
-                var lastname = f.Name.LastName();
-                var firstname = f.Name.FirstName(gender == Gender.Male ? Bogus.DataSets.Name.Gender.Male : Bogus.DataSets.Name.Gender.Female);
-                var email = $"{firstname.ToLower()}.{lastname.ToLower()}@spengergasse.at";
-                return new Student(
-                    firstname, lastname, email, schoolclass,
-                    gender,
-                    f.Date.BetweenDateOnly(new DateOnly(2008, 1, 1), new DateOnly(2009, 1, 1)));
-            })
-            .Generate(4 * 25)
-            .DistinctBy(s => s.Email)
+        int teacherIdx = 0;
+        var languageweeks = schoolclasses[..^1].Select(schoolclass =>
+        {
+            var destination = faker.Random.ListItem(destinations);
+            var from = faker.Date.BetweenDateOnly(
+                DateOnly.FromDateTime(minDate), DateOnly.FromDateTime(maxDate));
+            var to = from.AddDays(faker.Random.Int(5, 8));
+            var teacher = teachers[teacherIdx++];
+            var supportTeacher = teachers[teacherIdx++].OrNull(faker, 0.2f);
+            var pricePerPerson = faker.Random.Int(800, 1200);
+            var languageweek = new LanguageWeek(
+                schoolclass, destination, from, to, teacher, pricePerPerson)
+            { SupportTeacher = supportTeacher };
+            return languageweek;
+        })
+        .ToList();
+        Languageweeks.AddRange(languageweeks);
+        SaveChanges();
+        languageweeks[..^1].ForEach(l => GenerateDistinct(f =>
+        {
+            var student = f.Random.ListItem(students[l.Schoolclass]);
+            var registrationDate = l.From
+                .AddDays(f.Random.Int(-90, -70))
+                .ToDateTime(new TimeOnly(8, 0, 0).AddMinutes(f.Random.Int(0, 8 * 60)));
+            return new Registration(l, student, registrationDate);
+        },
+            faker.Random.Int(6 * students[l.Schoolclass].Count / 10, 8 * students[l.Schoolclass].Count / 10),
+            r => r.Student));
+    }
+
+    private List<T> Generate<T>(Func<Faker, T> generator, int count) where T : class
+    {
+        var data = new Faker<T>("de")
+            .CustomInstantiator(generator)
+            .Generate(count)
             .ToList();
-            Students.AddRange(students);
-            SaveChanges();
+        var set = Set<T>();
+        set.AddRange(data);
+        SaveChanges();
+        return data;
+    }
 
-            {
-                var languageweek = new Model.LanguageWeek(
-                    schoolclasses.First(s => s.Shortname == "4AHIF"),
-                    destinations[0],
-                    new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 9),
-                    teachers[0],
-                    800);
-                languageweek.SupportTeacher = teachers[2];
-                languageweek.Registrations.AddRange(GenerateRegistrations(faker, students, languageweek));
-                Languageweeks.Add(languageweek);
-            }
-            {
-                var languageweek = new Model.LanguageWeek(
-                    schoolclasses.First(s => s.Shortname == "4CHIF"),
-                    destinations[0],
-                    new DateOnly(2026, 4, 8), new DateOnly(2026, 4, 15),
-                    teachers[1],
-                    1200);
-                languageweek.SupportTeacher = teachers[2];
-                languageweek.Registrations.AddRange(GenerateRegistrations(faker, students, languageweek));
-                Languageweeks.Add(languageweek);
-            }
-            {
-                var languageweek = new Model.LanguageWeek(
-                    schoolclasses.First(s => s.Shortname == "4AHBGM"),
-                    destinations[1],
-                    new DateOnly(2026, 6, 8), new DateOnly(2026, 6, 16),
-                    teachers[2],
-                    1200);
-                languageweek.SupportTeacher = teachers[1];
-                languageweek.Registrations.AddRange(GenerateRegistrations(faker, students, languageweek));
-                Languageweeks.Add(languageweek);
-            }
-            SaveChanges();
-        }
-
-        private List<Registration> GenerateRegistrations(Faker f, List<Student> students, Model.LanguageWeek languageweek)
-        {
-            var className = languageweek.Schoolclass.Shortname;
-            var classStudents = students.Where(s => s.Schoolclass.Shortname == className).ToList();
-            var count = f.Random.Int((int)Math.Ceiling(classStudents.Count * 0.7), classStudents.Count);
-            var registrations = classStudents.Select(cs =>
-            {
-                var registrationDate = f.Date.Between(
-                    languageweek.From.AddDays(-60).ToDateTime(new TimeOnly(0)),
-                    languageweek.From.AddDays(-30).ToDateTime(new TimeOnly(0)));
-                registrationDate = new DateTime(registrationDate.Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond);
-                return new Registration(languageweek, cs, registrationDate);
-            }).ToList();
-
-            return f.Random.ListItems(registrations, count).ToList();
-        }
+    private List<T> GenerateDistinct<T, Tkey>(Func<Faker, T> generator, int count, params Func<T, Tkey>[] distinctBys) where T : class
+    {
+        var dataEnumerable = new Faker<T>("de")
+            .CustomInstantiator(generator)
+            .GenerateForever();
+        foreach (var distinctBy in distinctBys)
+            dataEnumerable = dataEnumerable.DistinctBy(distinctBy);
+        var data = dataEnumerable.Take(count).ToList();
+        var set = Set<T>();
+        set.AddRange(data);
+        SaveChanges();
+        return data;
     }
 }

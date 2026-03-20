@@ -26,9 +26,7 @@ public class Program
 
         builder.Services.AddSingleton<TimeProvider>((provider) => TimeProvider.System);
 
-        builder.Services.AddScoped<ILanguageweekService, LanguageweekService>((provider) => new LanguageweekService(
-            db: provider.GetRequiredService<LanguageweekContext>(),
-            timeProvider: provider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 
         // STEP 2: Configuring ASP.NET Core request pipeline
         var app = builder.Build();

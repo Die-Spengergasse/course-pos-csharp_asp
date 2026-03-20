@@ -52,7 +52,7 @@ public class TestWebApplicationFactory<Tcontext>(string environment = "Testing")
             typeof(T),
             lifetime switch
             {
-                ServiceLifetime.Singleton => (serviceCollection) => serviceCollection.AddScoped(factoryFuncion),
+                ServiceLifetime.Singleton => (serviceCollection) => serviceCollection.AddSingleton(factoryFuncion),
                 ServiceLifetime.Transient => (serviceCollection) => serviceCollection.AddTransient(factoryFuncion),
                 _ => (serviceCollection) => serviceCollection.AddScoped(factoryFuncion)
             });

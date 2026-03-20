@@ -35,7 +35,7 @@ Mit ○ gekennzeichnete Kapitel sind Erweiterungskapitel.
 
 ### Übungen
 
-- [Sprachwochenverwaltung (Services, Controller, Mocking; für HIF)](./Uebungen/01_Languageweek/README.adoc)
+- [Übungsprüfung zu Services und RESTful API: Sprachwochenverwaltung](./Uebungen/01_Languageweek/README.adoc)
 
 ### Installation von Visual Studio 2026
 
