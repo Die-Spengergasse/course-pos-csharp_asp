@@ -1,0 +1,505 @@
+= ○ GraphQL mit ASP.NET Core und HotChocolate
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+== Geschichte und Motivation von GraphQL
+
+Um GraphQL wirklich zu verstehen, hilft ein Blick auf seine Entstehungsgeschichte.
+Etwa im Jahr 2012 stand Facebook (heute Meta) vor einem massiven Problem: Die Nutzung von Smartphones explodierte, aber die mobilen Netzwerke (oft noch 3G) waren langsam und unzuverlässig.
+Gleichzeitig wurde die Facebook-App – insbesondere der News Feed – immer komplexer.
+
+Facebook nutzte damals klassische REST-APIs.
+Das führte bei der Entwicklung der mobilen Apps zu zwei massiven Performance-Killern:
+
+* **Under-fetching (zu viele Requests):** Um einen News-Feed-Eintrag anzuzeigen, musste die App zuerst den Post laden (_GET /posts/1_), dann den Autor (_GET /users/123_), dann die Kommentare (_GET /posts/1/comments_) und dann die Autoren der Kommentare.
+Dutzende Netzwerk-Requests verzögerten den Seitenaufbau enorm.
+* **Over-fetching (zu viele Daten):** Alternativ baute das Backend-Team riesige Endpunkte (_GET /feed_), die *alles* zurückgaben.
+Die App brauchte vielleicht nur den Namen des Autors und den Text des Posts, bekam aber das komplette Profil des Autors inklusive Geburtsdatum, Freundesliste und Profilbild-URLs geschickt.
+Das verschwendete wertvolles mobiles Datenvolumen und Akku.
+
+**Die Lösung:** Facebook entwickelte intern eine neue Abfragesprache, bei der nicht der Server bestimmt, welche Daten zurückkommen, sondern der **Client**. Die mobile App konnte nun in einem einzigen Request an einen einzigen Endpunkt exakt definieren, welche Felder sie für den aktuellen View benötigt.
+Nichts mehr und nichts weniger.
+
+2015 wurde GraphQL als Open-Source-Projekt veröffentlicht und revolutionierte die API-Entwicklung.
+Seit 2018 wird der Standard von der unabhängigen *GraphQL Foundation* (unter dem Dach der Linux Foundation) gepflegt und heute von Tech-Giganten wie GitHub, Shopify, Netflix und Airbnb eingesetzt.
+
+=== Warum eigentlich "Graph"?
+
+Der Name "GraphQL" leitet sich nicht von grafischen Benutzeroberflächen oder Diagrammen (wie Balken- oder Tortendiagrammen) ab, sondern aus der **Graphentheorie** der Mathematik und Informatik.
+
+In fast jeder Anwendung sind Daten stark relational miteinander verknüpft.
+In unserem Eventmanager-Beispiel hat ein _Event_ mehrere _Shows_, eine _Show_ hat _Contingents_, und dort gibt es _Tickets_ für _Guests_. Stellt man diese Verbindungen visuell dar, entsteht ein komplexes Netz aus Knoten (Nodes) und Kanten (Edges) – ein sogenannter **Graph**.
+
+Während klassische REST-APIs diese Daten oft in starre, baumartige Dokumente pro Endpunkt zwingen, betrachtet GraphQL das gesamte Domain-Modell als einen einzigen, großen, zusammenhängenden Graphen. 
+
+Mit einer Abfrage (Query) steigt der Client an einem bestimmten Knoten (z. B. einem _Guest_) in diesen Graphen ein und navigiert ("traversiert") entlang der Kanten zu den verknüpften Daten (z. B. zu seinen _Tickets_ und deren _Shows_). GraphQL erlaubt es also, exakt den "Teil-Graphen" (Subgraph) abzufragen, den das Frontend gerade für die Darstellung benötigt.
+
+image::{root_dir}/graph_1549.jpg[]
+
+== GraphQL im Vergleich zu REST
+
+Während wir bei REST-APIs für jede Ressource (z. B. Events, Shows, Guests) eigene Endpunkte definieren und aufrufen, verfolgt **GraphQL** einen fundamental anderen Ansatz.
+
+Bei GraphQL gibt es in der Regel nur einen einzigen Endpunkt (meist _/graphql_). Der Client sendet an diesen Endpunkt eine strukturierte Abfrage und definiert *exakt*, welche Datenfelder er zurückbekommen möchte. 
+
+Das löst die oben beschriebenen klassischen Probleme von REST (Over-fetching und Under-fetching) elegant.
+
+=== Ein Rückschritt zu RPC? (Richardson Maturity Model)
+
+Wenn man sich an das *Richardson Maturity Model (RMM)* für RESTful APIs erinnert, könnte man bei GraphQL stutzig werden: Ein einziger Endpunkt (_/graphql_), der für alle Lese- und Schreiboperationen per _POST_ aufgerufen wird?
+Das klingt auf den ersten Blick stark nach **Level 0 (The Swamp of POX / RPC)**, wo HTTP lediglich als Tunnel für Funktionsaufrufe (Remote Procedure Calls) genutzt wurde. 
+
+Ist GraphQL also ein Rückschritt in die dunkle Zeit der RPC-APIs? 
+**Nein, ganz im Gegenteil.**
+
+GraphQL entzieht sich bewusst dem Richardson Maturity Model, da das RMM bewertet, wie gut eine API die Prinzipien von *REST und HTTP* (Verben, Caching, URIs) ausnutzt.
+GraphQL nutzt HTTP aber explizit nur als **Transportmedium**, nicht als Architekturstil.
+Der Unterschied zu klassischem RPC liegt in der Intelligenz und Struktur:
+
+* **Client-driven statt Server-driven:** Bei RPC definiert der Server starre Methoden (z. B. _getGuestWithTickets(id)_). Bei GraphQL definiert der Server nur ein zusammenhängendes Datenmodell (einen Graphen). Der Client navigiert selbst durch diesen Graphen und pickt sich die benötigten Daten heraus.
+* **Typisierung und Introspektion:** Eine GraphQL-API hat ein stark typisiertes Schema.
+Der Client kann die API abfragen (Introspektion), um herauszufinden, welche Daten und Relationen überhaupt existieren.
+Das war bei alten RPC-Ansätzen ohne externe Dokumentation oft unmöglich.
+* **Ressourcenorientierung:** Obwohl es nur einen Endpunkt gibt, dreht sich bei GraphQL alles um Ressourcen (Knoten im Graphen) und deren Beziehungen zueinander.
+Es ist konzeptionell sehr nah an REST, löst das Transportproblem aber auf seine eigene Weise.
+
+=== Tabelle: GraphQL vs. REST Abfrage
+
+[%header,cols="1a,1a"]
+|===
+|REST|GraphQL
+
+|**Endpunkte**
+Meist viele (z. B. _/api/events_, _/api/guests/{id}_)
+|**Endpunkte**
+Nur einer (z. B. _/graphql_)
+
+|**Datenstruktur**
+Wird fix vom Server durch DTOs (Data Transfer Objects) vorgegeben.
+|**Datenstruktur**
+Wird flexibel vom Client in der Abfrage (Query) definiert.
+
+|**Beispiel-Request (Gast mit Tickets)** +
+Benötigt oft zwei Aufrufe oder stark angepasste DTOs:
+_GET /api/guests/1_
+_GET /api/guests/1/tickets_
+|**Beispiel-Request (Gast mit Tickets)** +
+Ein einziger Aufruf:
+[source,graphql]
+----
+query {
+  guests(where: { id: { eq: 1 } }) {
+    firstname
+    lastname
+    tickets {
+      ticketState
+    }
+  }
+}
+----
+|===
+
+== Implementierung in ASP.NET Core mit HotChocolate
+
+Um GraphQL in ASP.NET Core zu integrieren, nutzen wir das Framework **HotChocolate**. Es integriert sich nahtlos in Entity Framework Core und macht es extrem einfach, bestehende Datenbankmodelle abzufragen.
+
+Für unser Projekt benötigen wir folgende NuGet-Pakete:
+
+* _HotChocolate.AspNetCore_ (für das API-Projekt)
+* _HotChocolate.Data.EntityFramework_ (für Projektionen, Filterung und Sortierung im Application-Projekt)
+
+== Konfiguration des ASP Servers
+
+In der Datei _Program.cs_ müssen wir den GraphQL-Server registrieren und unsere Query-Klasse sowie die gewünschten Middleware-Komponenten (Projektionen, Filter, Sortierung) hinzufügen.
+Wir registrieren außerdem die _DbContextFactory_, damit HotChocolate effizient und threadsicher mit der Datenbank kommunizieren kann.
+
+[source,csharp]
+----
+// STEP 1: Configuring ASP.NET Core Services
+builder.Services.AddGraphQLServer()
+    .AddQueryType<Eventmanager.Application.GraphQL.Query>()
+    .AddType<Entity>()
+    .AddProjections()
+    .AddFiltering()
+    .AddSorting()
+    .RegisterDbContextFactory<EventContext>();
+----
+
+Im Bereich der Request-Pipeline weisen wir ASP.NET Core an, den Endpunkt bereitzustellen:
+
+[source,csharp]
+----
+// STEP 2: Configuring ASP.NET Core request pipeline
+app.MapGraphQL(); // Standardmäßig unter http://localhost:5080/graphql erreichbar
+----
+
+=== Die Query-Klasse anlegen
+
+Der Kern von GraphQL sind die sogenannten *Queries* (Leseoperationen). Wir legen dafür eine Klasse _Query.cs_ an.
+Dank HotChocolate können wir einfach _IQueryable<T>_ direkt aus unserem _EventContext_ zurückgeben. 
+
+Besonders wichtig sind die Attribute über den Methoden:
+
+* _[UseProjection]_: Sorgt dafür, dass GraphQL-Queries in echte SQL _SELECT_-Statements übersetzt werden (es werden nur die Spalten aus der DB geladen, die der Client auch wirklich anfragt).
+* _[UseFiltering]_: Erlaubt es dem Client, Daten zu filtern (z. B. nach Namen).
+* _[UseSorting]_: Erlaubt es dem Client, die Ergebnisse zu sortieren.
+
+[source,csharp]
+----
+using Eventmanager.Infrastructure;
+using Eventmanager.Model;
+using HotChocolate.Data;
+using System.Linq;
+
+namespace Eventmanager.Application.GraphQL;
+
+public class Query
+{
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Event> GetEvents(EventContext db)
+        => db.Events;
+
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Show> GetShows(EventContext db)
+        => db.Shows;
+
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Guest> GetGuests(EventContext db)
+        => db.Guests;
+}
+----
+
+== Abfragebeispiele in Bezug auf das Programm
+
+Wenn du das Projekt startest und im Browser _http://localhost:5080/graphql_ öffnest, landest du in **Banana Cake Pop**, der integrierten GraphQL-IDE von HotChocolate.
+Hier kannst du Abfragen interaktiv testen.
+
+image::{root_dir}/graphql_frontend_1802.png[]
+
+Dank unserer Attribute (_[UseProjection]_, _[UseFiltering]_, _[UseSorting]_) aus der _Query_-Klasse sind sehr mächtige Abfragen möglich.
+
+**Beispiel 1: Events mit ihren Shows abfragen (Projektion)**
+Wir holen uns alle Events und dazu direkt die verknüpften Shows (inklusive Datum).
+
+[source,graphql]
+----
+query {
+  events {
+    name
+    shows {
+      date
+    }
+  }
+}
+----
+
+**Beispiel 2: Filtern und Sortieren von Gästen**
+Wir suchen nach allen Gästen, deren Nachname mit "S" beginnt, und sortieren sie absteigend nach ihrem Geburtsdatum.
+Wir fragen nur Vornamen, Nachnamen und Geburtsdatum ab.
+
+[source,graphql]
+----
+query {
+  guests(
+    where: { lastname: { startsWith: "S" } },
+    order: { birthDate: DESC }
+  ) {
+    firstname
+    lastname
+    birthDate
+  }
+}
+----
+
+== GraphQL Syntax und Möglichkeiten im Detail
+
+GraphQL bietet eine stark typisierte und extrem flexible Abfragesprache.
+Im Gegensatz zu REST, wo der Server die Struktur der Antwort diktiert, bestimmt bei GraphQL der Client, wie die JSON-Antwort aussehen soll.
+
+Hier sind die wichtigsten syntaktischen Konzepte von GraphQL:
+
+=== 1. Queries (Lesezugriffe)
+Das Schlüsselwort _query_ definiert einen Lesezugriff (vergleichbar mit einem GET-Request bei REST). Der Client gibt exakt an, welche Felder (_fields_) er von welchen Objekten haben möchte.
+Relationen werden einfach als verschachtelte Blöcke geschrieben.
+
+[source,graphql]
+----
+query {
+  events {
+    id
+    name
+    shows {
+      id
+      date
+    }
+  }
+}
+----
+*Ergebnis:* Eine Liste von Events, bei der jedes Event nur die _id_, den _name_ und eine Liste seiner _shows_ (nur mit _id_ und _date_) enthält.
+Alle anderen Eigenschaften (wie z.B. Kontingente) werden ignoriert, was Bandbreite spart.
+
+=== 2. Argumente (Arguments)
+Felder können Argumente entgegennehmen.
+Bei HotChocolate generieren die Attribute _[UseFiltering]_ und _[UseSorting]_ automatisch komplexe Argumente wie _where_ oder _order_ für uns.
+
+[source,graphql]
+----
+query {
+  guests(
+    where: { lastname: { startsWith: "M" } }
+    order: { birthDate: DESC }
+  ) {
+    firstname
+    lastname
+  }
+}
+----
+
+=== 3. Aliase (Aliases)
+Manchmal möchte man dasselbe Feld (oder denselben Endpunkt) in einer Abfrage mehrfach mit unterschiedlichen Argumenten aufrufen.
+Da JSON keine doppelten Schlüssel (Keys) erlaubt, nutzt man *Aliase*, um das Ergebnis umzubenennen.
+
+[source,graphql]
+----
+query {
+  adultGuests: guests(where: { birthDate: { lt: "2003-01-01" } }) {
+    firstname
+    lastname
+  }
+  youngGuests: guests(where: { birthDate: { gte: "2003-01-01" } }) {
+    firstname
+    lastname
+  }
+}
+----
+*Ergebnis:* Ein JSON-Objekt mit den zwei Schlüsseln _"adultGuests"_ und _"youngGuests"_.
+
+=== 4. Fragmente (Fragments)
+Wenn Abfragen komplexer werden, fragt man oft an verschiedenen Stellen die gleichen Felder ab. *Fragmente* sind wiederverwendbare Bausteine, die den Code übersichtlich halten (DRY-Prinzip).
+
+[source,graphql]
+----
+# Definition des Fragments auf dem Typ "Guest"
+fragment GuestDetails on Guest {
+  id
+  firstname
+  lastname
+  birthDate
+}
+
+query {
+  guests {
+    ...GuestDetails
+    tickets {
+      ticketState
+    }
+  }
+}
+----
+
+=== 5. Datentypen und das Ausrufezeichen (!)
+
+GraphQL ist stark typisiert.
+Das bedeutet, jedes Feld und jede Variable hat einen definierten Datentyp. 
+
+Die Basis bilden die sogenannten **Skalare** (primitive Datentypen):
+
+* _Int_ (Ganzzahl)
+* _Float_ (Gleitkommazahl)
+* _String_ (Zeichenkette)
+* _Boolean_ (Wahrheitswert)
+* _ID_ (Ein eindeutiger Identifikator, wird oft als String übertragen)
+
+Zusätzlich zu diesen Standard-Skalaren erweitert HotChocolate das Schema automatisch basierend auf unseren C#-Klassen.
+So wird zum Beispiel ein C# _DateOnly_ in GraphQL als _LocalDate_ repräsentiert, und ein C# _DateTime_ als _DateTime_.
+
+**Das Ausrufezeichen (!)**
+Eine Besonderheit von GraphQL ist der Umgang mit Null-Werten.
+In GraphQL sind standardmäßig *alle* Felder und Argumente "nullable" (sie dürfen _null_ sein). 
+Wenn man sicherstellen will, dass ein Wert *niemals* _null_ sein darf (es sich also um ein Pflichtfeld handelt), hängt man ein Ausrufezeichen an den Typ an:
+
+* _String_: Ein String oder _null_.
+* _String!_: Ein garantierter String (Pflichtfeld, darf nicht _null_ sein).
+* _[String]_: Eine Liste von Strings.
+Die Liste selbst kann _null_ sein, und die Einträge darin könnten ebenfalls _null_ sein.
+* _[String!]!_: Eine garantierte Liste (nicht _null_), die garantiert nur Strings (und keine _null_-Werte) enthält.
+
+=== 6. Variablen (Variables)
+In der Praxis baut man GraphQL-Strings im Frontend (z. B. in React oder Angular) nicht mit String-Konkatenation zusammen.
+Stattdessen definiert man Queries mit Variablen (gekennzeichnet durch ein _$_). Die eigentlichen Werte werden als separates JSON-Wörterbuch (Variables-Objekt) mitgeschickt.
+Hier sieht man auch sehr gut den Einsatz der Datentypen und des Ausrufezeichens.
+
+**Die Abfrage (Query):**
+[source,graphql]
+----
+# $birthdate ist eine Variable vom Typ LocalDate (das Ausrufezeichen ! bedeutet "required/Pflichtfeld")
+query GetGuestById($birthdate: LocalDate!) {
+  guests(where: { birthDate: { lt: $birthdate } }) {
+    firstname
+    lastname
+    birthDate
+  }
+}
+----
+
+**Das zugehörige Variables-JSON (wird im Request-Body separat mitgesendet):**
+[source,json]
+----
+{
+  "birthdate": "2005-01-01"
+}
+----
+
+=== 7. Mutationen (Mutations)
+Während _query_ zum Lesen gedacht ist, verwendet man das Schlüsselwort _mutation_, um Daten am Server zu verändern (Create, Update, Delete - analog zu POST, PUT, DELETE in REST). 
+
+Nach einer erfolgreichen Mutation erlaubt GraphQL es, die veränderten oder neu erstellten Daten sofort im selben Request wieder abzufragen.
+
+[source,graphql]
+----
+mutation CreateNewGuest {
+  # Angenommener Name der Mutations-Methode am Server
+  addGuest(input: { firstname: "Max", lastname: "Mustermann", birthDate: "1990-01-01" }) {
+    # Rückgabe nach dem Erstellen:
+    id
+    firstname
+  }
+}
+----
+_Hinweis zur Implementierung:_ Um Mutationen in HotChocolate zu nutzen, muss in ASP.NET Core eine separate Klasse (z. B. _Mutation.cs_) erstellt und in der _Program.cs_ mit _.AddMutationType<Mutation>()_ registriert werden.
+
+=== 8. Direktiven (Directives)
+Direktiven sind Anweisungen an den GraphQL-Server, wie er die Abfrage ausführen soll.
+Sie beginnen mit einem _@_. Die bekanntesten sind _@include_ und _@skip_, um Felder bedingt abzufragen.
+
+[source,graphql]
+----
+query GetGuests($withTickets: Boolean!) {
+  guests {
+    firstname
+    lastname
+    # Das Feld tickets wird nur geladen, wenn die Variable $withTickets true ist
+    tickets @include(if: $withTickets) {
+      ticketState
+    }
+  }
+}
+----
+
+== Verwendung in einer SPA (Next.js)
+
+Einer der größten Vorteile von GraphQL ist, dass wir für einfache Abfragen keine schweren Client-Bibliotheken (wie Apollo Client oder Relay) benötigen.
+Da GraphQL-Requests standardmäßig als gewöhnliche **HTTP POST-Requests** gesendet werden, können wir in modernen Frontends wie Next.js einfach die native _fetch_-API nutzen.
+
+Der Body des Requests muss lediglich ein JSON-Objekt sein, das ein Property _query_ (und optional _variables_) enthält.
+Die Antwort des Servers ist immer ein JSON-Objekt, das im Erfolgsfall ein _data_-Property und im Fehlerfall ein _errors_-Array besitzt.
+
+Das folgende Beispiel zeigt eine typische **Next.js Server Component** (App Router), die Daten aus unserer HotChocolate-API abruft und darstellt:
+
+[source,tsx]
+----
+import React from 'react';
+
+// 1. Typdefinitionen für unser GraphQL-Ergebnis
+interface Ticket {
+  ticketState: string;
+}
+
+interface Guest {
+  id: number;
+  firstname: string;
+  lastname: string;
+  tickets: Ticket[];
+}
+
+interface GraphQLResponse {
+  data?: {
+    guests: Guest[];
+  };
+  errors?: any[];
+}
+
+// 2. Die asynchrone Fetch-Funktion
+async function fetchGuests(): Promise<Guest[]> {
+  // Die GraphQL-Abfrage als normaler String
+  const query = _
+    query {
+      guests(order: { lastname: ASC }) {
+        id
+        firstname
+        lastname
+        tickets {
+          ticketState
+        }
+      }
+    }
+  _;
+
+  // POST-Request an unseren ASP.NET Core GraphQL Endpunkt
+  const res = await fetch('http://localhost:5080/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query }),
+    // Next.js Caching-Verhalten steuern (z. B. immer neu laden)
+    cache: 'no-store' 
+  });
+
+  const json: GraphQLResponse = await res.json();
+
+  // Fehlerbehandlung: GraphQL liefert bei Queries oft trotzdem HTTP 200, 
+  // packt die Fehler aber in das "errors" Array im JSON.
+  if (json.errors) {
+    console.error("GraphQL Errors:", json.errors);
+    throw new Error("Fehler beim Laden der Daten aus der GraphQL-API.");
+  }
+
+  return json.data?.guests || [];
+}
+
+// 3. Die Next.js Server Component
+export default async function GuestsPage() {
+  const guests = await fetchGuests();
+
+  return (
+    <main>
+      <h1>Gästeliste (via GraphQL)</h1>
+      <ul>
+        {guests.map(guest => (
+          <li key={guest.id}>
+            <strong>{guest.lastname}, {guest.firstname}</strong>
+            <br />
+            Anzahl Tickets: {guest.tickets.length}
+          </li>
+        ))}
+      </ul>
+    </main>
+  );
+}
+----
+
+=== Wichtige Erkenntnisse für das Frontend:
+
+* **Einziger Endpunkt:** Die URL (_http://localhost:5080/graphql_) bleibt immer gleich, egal welche Daten wir laden.
+* **Fehlerbehandlung:** Selbst wenn eine GraphQL-Query fehlschlägt (z. B. wegen eines Tippfehlers im Query-String), antwortet der Server oft mit **HTTP 200 OK**. Der eigentliche Fehler muss im _errors_-Array des Response-JSONs geprüft werden.
+* **Typsicherheit:** Das Frontend (_interface Guest_) spiegelt exakt die Struktur der Query wider, nicht zwingend die des gesamten Datenbankmodells.

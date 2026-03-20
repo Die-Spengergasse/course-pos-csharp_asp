@@ -57,4 +57,7 @@ include::./{root_dir}/README.adoc[tag=!pdf_exclude]
 :root_dir: 21_Hypermedia
 include::./{root_dir}/README.adoc[tag=!pdf_exclude]
 
+:root_dir: 22_GraphQL
+include::./{root_dir}/README.adoc[tag=!pdf_exclude]
+
 :leveloffset: 0
