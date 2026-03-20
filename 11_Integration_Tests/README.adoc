@@ -103,8 +103,7 @@ public class TestWebApplicationFactory<Tcontext>(string environment = "Testing")
 In link:../Eventmanager/Eventmanager.Test/TestWebApplicationFactory.cs[→ TestWebApplicationFactory.cs] gibt es eine Implementierung, die auch bei Prüfungen zur Verfügung steht.
 Sie hat folgende Methoden, die wir danach in unseren Integration Tests nutzen:
 
-
-`void InitializeDatabase(Action<Tcontext> action)`::	
+`void InitializeDatabase(Action<Tcontext> action)`::    
 Initialisiert die Datenbank mit einer vorgegebenen Methode.
 Da wir über den Serviceprovider auf die Datenbank zugreifen müssen, führt diese Methode folgende Schritte vor der Ausführung der übergebenen Funktion durch:
 +
@@ -195,6 +194,50 @@ Die RFC problem detail kann 2 Formen haben.
 +
 Es werden Teilstrings verglichen (nicht case sensitive), d. h. _not found_ ist für alle Fehlermeldungen zugreffend, die _not found_ in der Fehlermeldung in _detail_ oder in _errors_ haben.
 
+=== Arbeiten mit JsonElement (System.Text.Json)
+
+Oft liefern API-Aufrufe (besonders bei POST, PUT oder DELETE) dynamische oder kleine Datenstrukturen zurück, für die sich das Anlegen eines eigenen DTOs nicht lohnt (z. B. `{ "id": 12 }`). In diesen Fällen liefert die Test-Factory ein `JsonElement` zurück, mit dem die "rohe" JSON-Antwort dynamisch ausgewertet werden kann.
+
+Folgende Methoden sind für das Extrahieren von Daten in den `Assert`-Prüfungen wichtig:
+
+`JsonElement GetProperty(string propertyName)`::
+Sucht auf einem JSON-Objekt nach einer Eigenschaft mit dem angegebenen Namen und gibt deren Wert als neues `JsonElement` zurück. Damit navigiert man im JSON-Baum.
++
+[source,csharp]
+----
+var idElement = content.GetProperty("id");
+----
+
+`int GetInt32()`::
+Wandelt den aktuellen JSON-Zahlenwert in einen C#-`int` um. Nützlich zur Überprüfung von IDs oder Zählern.
++
+[source,csharp]
+----
+Assert.Equal(12, content.GetProperty("id").GetInt32());
+----
+
+`string? GetString()`::
+Liest den aktuellen JSON-String-Wert aus und gibt ihn als C#-`string` zurück.
++
+[source,csharp]
+----
+Assert.Equal("Floor", content.GetProperty("contingentType").GetString());
+----
+
+`JsonElement.ArrayEnumerator EnumerateArray()`::
+Wenn das `JsonElement` ein JSON-Array darstellt (`[ ... ]`), liefert diese Methode einen Enumerator, um durch die einzelnen Array-Elemente zu iterieren. Jedes Element ist wiederum ein `JsonElement`.
++
+[source,csharp]
+----
+foreach (JsonElement item in content.EnumerateArray())
+{
+    Assert.True(item.GetProperty("id").GetInt32() > 0);
+}
+----
+
+`JsonElement.ObjectEnumerator EnumerateObject()`::
+Wenn das `JsonElement` ein JSON-Objekt darstellt (`{ ... }`), kann hiermit durch alle Key-Value-Paare des Objekts iteriert werden. Jedes Element der Schleife ist ein `JsonProperty` mit einem Namen (`Name`) und einem Wert (`Value`). Dies ist besonders nützlich, um dynamische Validierungsfehler auszuwerten.
+
 === Konkrete Verwendung im Integration Test
 
 Die folgende Klasse zeigt den Test des link:../Eventmanager/Eventmanager.Api/Controllers/ContingentsController.cs[→ ContingentsControllers]
@@ -209,6 +252,7 @@ using Eventmanager.Infrastructure;
 using Eventmanager.Model;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using System;
 using System.Linq;
@@ -227,8 +271,10 @@ public class ContingentsControllerTests : IDisposable
     public ContingentsControllerTests()
     {
         _factory = new TestWebApplicationFactory<EventContext>();
-        _factory.SubstituteService<EventContext>(opt => opt.UseSqlite(_connection));
-        _factory.SubstituteService<TimeProvider>(opt => _timeProvider);
+        _factory.SubstituteService<EventContext>(
+            opt => opt.UseSqlite(_connection));
+        _factory.SubstituteService<TimeProvider>(
+            opt => _timeProvider, ServiceLifetime.Singleton);
     }
     /// <summary>
     /// Creates global test data for all unit tests.
@@ -252,16 +298,15 @@ public class ContingentsControllerTests : IDisposable
     public async Task GetContingentByIdReturns200WithDataTest()
     {
         GenerateFixtures();
-        var (response, contingent) = 
+        var (response, contingent) =
             await _factory.GetHttpContent<ContingentDto>("/api/contingents/1");
-
         Assert.Equal(200, (int)response.StatusCode);
         Assert.NotNull(contingent);
         Assert.True(contingent.Id != default);
     }
     /// <summary>
-    /// Checks whether POST /api/contingents returns HTTP 201 with ID and 
-    /// modifies the database.
+    /// Checks whether POST /api/contingents returns HTTP 201 with ID
+    /// and modifies the database.
     /// </summary>
     [Fact]
     public async Task CreateContingentReturns201Test()
@@ -270,11 +315,11 @@ public class ContingentsControllerTests : IDisposable
         var (response, content) = await _factory.PostHttpContent(
             "/api/contingents",
             new CreateContingentCmd(1, "Floor", 10));
-
         Assert.Equal(201, (int)response.StatusCode);
-        var contingentFromDb = _factory.QueryDatabase(
-            db => db.Contingents.First(c => c.Id == 2));
-        Assert.True(contingentFromDb.Id != default);
+        Assert.True(_factory.QueryDatabase(
+            db => db.Contingents.Any(c => c.Id == 2)));
+        // Create returns a JSON: { id : 12 }. 
+        // You can read the JSON with JsonElement Methods.
         Assert.True(content.GetProperty("id").GetInt32() != default);
     }
     /// <summary>
@@ -288,11 +333,10 @@ public class ContingentsControllerTests : IDisposable
         var (response, content) = await _factory.PutHttpContent(
             "/api/contingents/1",
             new UpdateContingentCmd(1, 1, "Floor", 10, 0));
-
         Assert.Equal(204, (int)response.StatusCode);
-        var contingentFromDb = _factory.QueryDatabase(
-            db => db.Contingents.First(c => c.Id == 1));
-        Assert.True(contingentFromDb.ContingentType == ContingentType.Floor);
+        Assert.True(_factory.QueryDatabase(
+            db => db.Contingents.Any(
+                c => c.Id == 1 && c.ContingentType == ContingentType.Floor)));
     }
     /// <summary>
     /// Checks whether DELETE /api/contingents/{id} returns HTTP 204
@@ -304,15 +348,13 @@ public class ContingentsControllerTests : IDisposable
         GenerateFixtures();
         var (response, content) = 
             await _factory.DeleteHttpContent("/api/contingents/1");
-
         Assert.Equal(204, (int)response.StatusCode);
-        var contingentFromDb = _factory.QueryDatabase(
-            db => db.Contingents.FirstOrDefault(c => c.Id == 1));
-        Assert.Null(contingentFromDb);
+        Assert.False(_factory.QueryDatabase(
+            db => db.Contingents.Any(c => c.Id == 1)));
     }
     /// <summary>
-    /// Checks whether POST /api/contingents returns HTTP 400 with the
-    /// corresponding error message in the problem detail.
+    /// Checks whether POST /api/contingents returns HTTP 400
+    /// with the corresponding error message in the problem detail.
     /// </summary>
     [Theory]
     [InlineData("xxx", 1, "invalid value for contingent type")]

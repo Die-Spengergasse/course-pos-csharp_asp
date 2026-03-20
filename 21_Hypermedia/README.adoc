@@ -1,4 +1,4 @@
-= Hypermedia und HATEOAS
+= ○ Hypermedia und HATEOAS
 :source-highlighter: rouge
 :icons: font
 :lang: DE

@@ -4,6 +4,7 @@ using Eventmanager.Infrastructure;
 using Eventmanager.Model;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using System;
 using System.Linq;
@@ -22,7 +23,7 @@ public class ContingentsControllerTests : IDisposable
     {
         _factory = new TestWebApplicationFactory<EventContext>();
         _factory.SubstituteService<EventContext>(opt => opt.UseSqlite(_connection));
-        _factory.SubstituteService<TimeProvider>(opt => _timeProvider);
+        _factory.SubstituteService<TimeProvider>(opt => _timeProvider, ServiceLifetime.Singleton);
     }
     /// <summary>
     /// Creates global test data for all unit tests.
@@ -61,8 +62,7 @@ public class ContingentsControllerTests : IDisposable
             "/api/contingents",
             new CreateContingentCmd(1, "Floor", 10));
         Assert.Equal(201, (int)response.StatusCode);
-        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.First(c => c.Id == 2));
-        Assert.True(contingentFromDb.Id != default);
+        Assert.True(_factory.QueryDatabase(db => db.Contingents.Any(c => c.Id == 2)));
         Assert.True(content.GetProperty("id").GetInt32() != default);
     }
     /// <summary>
@@ -76,8 +76,9 @@ public class ContingentsControllerTests : IDisposable
             "/api/contingents/1",
             new UpdateContingentCmd(1, 1, "Floor", 10, 0));
         Assert.Equal(204, (int)response.StatusCode);
-        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.First(c => c.Id == 1));
-        Assert.True(contingentFromDb.ContingentType == ContingentType.Floor);
+        Assert.True(_factory.QueryDatabase(
+            db => db.Contingents.Any(
+                c => c.Id == 1 && c.ContingentType == ContingentType.Floor)));
     }
     /// <summary>
     /// Checks whether DELETE /api/contingents/{id} returns HTTP 204 and modifies the database.
@@ -88,8 +89,7 @@ public class ContingentsControllerTests : IDisposable
         GenerateFixtures();
         var (response, content) = await _factory.DeleteHttpContent("/api/contingents/1");
         Assert.Equal(204, (int)response.StatusCode);
-        var contingentFromDb = _factory.QueryDatabase(db => db.Contingents.FirstOrDefault(c => c.Id == 1));
-        Assert.Null(contingentFromDb);
+        Assert.False(_factory.QueryDatabase(db => db.Contingents.Any(c => c.Id == 1)));
     }
     /// <summary>
     /// Checks whether POST /api/contingents returns HTTP 400 with the corresponding error message in the problem detail.
