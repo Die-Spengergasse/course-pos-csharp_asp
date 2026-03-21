@@ -33,6 +33,7 @@ Mit ○ gekennzeichnete Kapitel sind Erweiterungskapitel.
 - ○ [Encoding von ID Werten](./20_Id_Encoder/README.adoc)
 - ○ [HATEOAS](./21_Hypermedia/README.adoc)
 - ○ [GraphQL](./22_GraphQL/README.adoc)
+- ○ [Minimal API](./23_MinimalApi/README.adoc)
 
 ### Übungen
 

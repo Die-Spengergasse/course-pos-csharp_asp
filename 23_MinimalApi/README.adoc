@@ -1,0 +1,172 @@
+= ○ Minimal APIs in ASP.NET Core: Moderne Web-Entwicklung
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::root_dir[:root_dir: .]
+ifndef::github_url[:github_url: ..]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+
+== Minimal API vs. Controller
+
+Mit der Einführung neuerer ASP.NET Core Versionen hat Microsoft das Konzept der Minimal APIs etabliert.
+Ziel war es, die Einstiegshürde für C#-Entwickler massiv zu senken und gleichzeitig die Performance des Webservers zu optimieren.
+Minimal APIs reduzieren die Anzahl der notwendigen Dateien und Zeilen Code, um einen funktionierenden Endpunkt bereitzustellen.
+Die Minimal APIs bestehen im Wesentlichen aus _WebApplication_, _WebApplicationBuilder_ und Route Handlern.
+Diese Architektur ist besonders vorteilhaft für moderne Cloud-Native-Anwendungen und Microservices, die oft nur eine begrenzte Anzahl an Aufgaben erfüllen.
+
+Klassische ASP.NET Core Anwendungen nutzen Controller-Klassen, die tief in das MVC-Framework integriert sind.
+Ein Controller ist eine syntaktisch normale C#-Klasse, die spezielle Attribute für das Routing verwendet.
+Minimal APIs hingegen brechen mit diesem objektorientierten Zwang und bieten eine funktionale Alternative ohne diesen Klassen-Overhead.
+Anstatt ganze Klassen zu instanziieren, werden Endpunkte direkt an Handler-Funktionen wie Lambdas gebunden.
+Diese Architektur führt zu einer flacheren Lernkurve für Einsteiger und einer spürbar schnelleren Ausführungszeit für den Server.
+Da der MVC-Filter-Pipeline-Overhead entfällt, wird zudem der Speicherverbrauch pro Anfrage deutlich minimiert.
+
+=== Vergleichstabelle: Endpunkte vs. Controller im Detail
+
+[%header,cols="1a,1a"]
+|===
+| Controller-Ansatz 
+| Minimal API-Ansatz
+
+| Basiert auf Klassen, die zwingend von _ControllerBase_ erben müssen.
+| Nutzt kompakte Methoden-Aufrufe direkt am _WebApplication_ oder _RouteGroup_ Objekt.
+
+| Methoden innerhalb der Klasse verarbeiten die Anfragen in einem festen Kontext.
+| Lambda-Ausdrücke, lokale Funktionen oder statische Methoden dienen als Handler.
+
+| Nutzt deklarative Attribute wie _[HttpGet]_ oder _[Route]_ über den Methodenköpfen.
+| Nutzt explizite Methoden wie _MapGet()_ oder _MapPost()_ zur Definition der Routen.
+
+| Die Dependency Injection erfolgt klassisch über den Konstruktor beim Instanziieren der Klasse.
+| Abhängigkeiten werden direkt als Parameter in die jeweilige Handler-Methode injiziert.
+
+| Folgt dem strengen MVC-Muster, was oft zu einer Trennung von Logik und Routing führt.
+| Erlaubt einen funktionalen Ansatz für das gesamte API-Design.
+
+| Geeignet für komplexe Anwendungen mit sehr vielen Abhängigkeiten pro Ressource.
+| Perfekt für schlanke Dienste, die Agilität und maximale Performance priorisieren.
+|===
+
+image::{root_dir}/controller_endpoint_0711.jpg[]
+
+=== Location-Header: CreatedAtRoute vs. CreatedAtAction
+
+In Controllern nutzen wir oft die Methode _CreatedAtAction_, um auf eine andere Methode innerhalb der aktuellen Klasse zu verweisen.
+Da Minimal APIs keine Klassen-Methoden im herkömmlichen Sinne besitzen, kann das Framework diesen Bezug nicht automatisch herstellen.
+Stattdessen verwenden wir in der Minimal-Welt eine angepasste Methode, um die Route anhand ihres Namens zu identifizieren.
+Um dies nutzen zu können, müssen wir dem Ziel-Endpunkt mit der Erweiterung _WithName()_ einen Namen geben.
+Dieser Name fungiert als eindeutiger Bezeichner innerhalb der internen Routing-Tabelle von ASP.NET Core.
+Das Framework nutzt diesen Bezeichner zur Laufzeit, um die korrekte URL für den _Location_-Header im 201-Response zu generieren.
+Dies garantiert dem Client, dass er nach einer erfolgreichen Erstellung die Adresse der neuen Ressource zuverlässig mitgeteilt bekommt.
+
+== Implementierung von Endpunkten
+
+In vielen Online-Tutorials werden alle Endpunkte direkt in der Datei _Program.cs_ definiert.
+Bei realen Projekten mit vielen Ressourcen und komplexer Geschäftslogik führt das jedoch zu einer extrem unübersichtlichen Datei.
+Ein wesentliches Problem in professionellen Entwickler-Teams sind zudem die gefürchteten Merge-Konflikte in der Versionsverwaltung Git.
+Wenn fünf Entwickler gleichzeitig neue Routen oder Logik in die einzige _Program.cs_ schreiben, lässt sich der Code kaum noch fehlerfrei zusammenführen.
+Minimal APIs müssen jedoch nicht zwingend in der _Program.cs_ lokalisiert sein.
+Durch das Auslagern in separate, thematisch getrennte Dateien bleibt der Code modular und folgt dem Single Responsibility Principle.
+Dieses Vorgehen ermöglicht es Teams, parallel an verschiedenen Endpunkten zu arbeiten, ohne die zentrale Start-Datei der Applikation zu blockieren.
+
+=== Exkurs: Was sind Extension Methods?
+
+Um den Code für Minimal APIs in eigene Dateien auszulagern, nutzen wir sogenannte Extension Methods.
+Dieses Sprachfeature von C# erlaubt es uns, bestehende Klassen oder Interfaces um neue Methoden zu erweitern.
+Dabei muss der ursprüngliche Quellcode des Typs nicht verändert oder vererbt werden.
+Eine Extension Method ist immer eine statische Methode innerhalb einer statischen Klasse.
+Das wichtigste Merkmal ist das Schlüsselwort _this_ vor dem allerersten Parameter der Methode.
+Dieser erste Parameter gibt an, welcher Datentyp genau erweitert werden soll.
+In unserem API-Beispiel erweitern wir das Interface _IEndpointRouteBuilder_.
+Für den Aufrufer sieht es später im Code so aus, als wäre die neue Methode ein nativer Bestandteil des erweiterten Objekts.
+
+Mit der Einführung von C# 14 wurde dieses Konzept massiv erweitert.
+C# 14 fügt eine neue Syntax hinzu, um sogenannte Extension Members zu definieren.
+Diese neue Syntax ermöglicht es, neben den bekannten Methoden nun auch Extension Properties zu deklarieren.
+Darüber hinaus können nun auch statische Extension Members definiert werden, die den Typ selbst und nicht nur eine Instanz erweitern.
+In unserem Projekt benötigen wir dieses neue C# 14 Feature jedoch nicht.
+Da wir keine Extension Properties oder statischen Erweiterungen für unser Routing-Setup verwenden, reicht die klassische Syntax völlig aus.
+
+=== Das Interface IEndpointRouteBuilder und Route Groups
+
+Die Methode _MapGroup_ hilft dabei, Gruppen von Endpunkten mit einem gemeinsamen Präfix zu organisieren.
+Indem wir Erweiterungsmethoden für das zugrundeliegende Interface schreiben, können wir unsere Endpunkte in logische Einheiten gruppieren.
+Dies reduziert wiederholenden Code und erlaubt die Anpassung ganzer Endpunktgruppen mit einem einzigen Aufruf.
+Dies ist nicht nur syntaktisch sauber, sondern auch technisch effizient, da das Präfix _/minimalapi/contingents_ nur ein einziges Mal definiert werden muss.
+Darüber hinaus lassen sich an einer Gruppe zentrale Einstellungen wie Autorisierungsregeln oder Metadaten gesammelt anhängen.
+
+.Vollständiger Code: link:{github_url}/Eventmanager/Eventmanager.Api/Endpoints/ContingentEndpoints.cs[→ ContingentEndpoints.cs]
+[source,csharp]
+----
+public static class ContingentEndpoints
+{
+    public static RouteGroupBuilder MapContingentEndpoints(this IEndpointRouteBuilder routes)
+    {
+        var group = routes.MapGroup("/minimalapi/contingents");
+
+        group.MapGet("/{id}", async (int id, IEventService eventService) =>
+        {
+            // Die Logik zum Laden des Kontingents wird hier implementiert
+        }).WithName("GetContingentById");
+
+        return group;
+    }
+}
+----
+
+=== Dependency Injection mit Minimal API: Effizienz durch Method Injection
+
+Minimal APIs nutzen ein hochoptimiertes Parameter-Binding, das die Dependency Injection vereinfacht.
+Anstatt Dienste im Konstruktor einer Klasse zu speichern, deklarieren wir sie einfach als Parameter im jeweiligen Lambda-Handler.
+Das Framework wandelt Anfragedaten in stark typisierte Parameter um und bindet Dienste automatisch aus dem DI-Container.
+Ein entscheidender Vorteil gegenüber Controllern ist das Ladeverhalten der Dienste.
+In Minimal APIs wird ein Dienst wie der _IEventService_ nur dann instanziiert, wenn die spezifische Route auch tatsächlich aufgerufen wird.
+Bei Controllern hingegen müssen alle im Konstruktor definierten Abhängigkeiten sofort aufgelöst werden, sobald der Controller angefragt wird.
+Dies schont die Serverressourcen und beschleunigt die Antwortzeiten bei Routen mit wenigen Abhängigkeiten.
+
+=== Konfiguration des Servers für die Minimal API
+
+Die Einbindung der modularisierten Endpunkte erfolgt in der _Program.cs_ während der Konfiguration der Request-Pipeline.
+Nachdem die Anwendung mit _builder.Build()_ erstellt wurde, steht das Objekt _app_ zur Verfügung.
+Da die _WebApplication_ Instanz das entsprechende Routing-Interface implementiert, können wir unsere selbsterstellte Erweiterungsmethode dort einfach aufrufen.
+Es ist wichtig, diese Registrierung vor dem finalen Start des Servers mit _app.Run()_ durchzuführen.
+Auf diese Weise behalten wir eine saubere Trennung zwischen der Konfiguration der Services und dem eigentlichen Mapping der Endpunkte bei.
+
+[source,csharp]
+----
+var app = builder.Build();
+
+app.MapControllers();
+app.MapContingentEndpoints();
+
+app.Run();
+----
+
+== Unittests und Integration Tests: Stabilität durch Entkopplung
+
+Integration Tests bewerten die Komponenten einer App auf einer breiteren Ebene als Unittests.
+Ein großer Vorteil von ASP.NET Core ist, dass diese Tests konsequent auf der HTTP-Ebene ansetzen können.
+Wir verwenden dafür die _WebApplicationFactory_, die den gesamten Server inklusive aller Dienste für das System under Test bereitstellt.
+Es spielt für den Test keine Rolle, ob die Anfrage intern von einer Controller-Klasse oder einer Minimal API verarbeitet wird.
+Der bestehende Integration Test für den _ContingentsController_ kann daher fast ohne Code-Änderungen für die Minimal API übernommen werden.
+Wir müssen lediglich die Pfadangaben im Test-Client von _/api/contingents_ auf den neuen Pfad _/minimalapi/contingents_ anpassen.
+Diese Entkopplung macht unsere Testsuite extrem robust gegenüber internen Refactorings der Architektur.
+
+== Resümee: Wann sollte man welchen Ansatz wählen?
+
+Minimal APIs sind die ideale Wahl für Microservices, kleine Prototypen oder Endpunkte, die eine extrem hohe Performance erfordern.
+Sie reduzieren das Rauschen im Code und erlauben es, Logik und Routing nah beieinander zu halten.
+Controller bieten hingegen eine klassische, sehr starre Struktur, die in riesigen Anwendungen mit komplexen Modell-Validierungen Vorteile bieten kann.
+In Controllern lässt sich eine sehr tief verschachtelte Logik manchmal übersichtlicher in verschiedene Methoden aufteilen.
+Schüler sollten jedoch lernen, dass es kein striktes "Entweder-oder" geben muss.
+In modernen Enterprise-Projekten ist es absolut üblich, beide Ansätze je nach spezifischem Anwendungsfall innerhalb derselben Applikation zu kombinieren.

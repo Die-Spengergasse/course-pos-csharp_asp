@@ -1,3 +1,4 @@
+using Eventmanager.Api.Endpoints;
 using Eventmanager.Application.Model;
 using Eventmanager.Application.Repositories;
 using Eventmanager.Application.Services;
@@ -72,6 +73,7 @@ public class Program
         }
         // Assign controllers to routes.
         app.MapControllers();
+        app.MapContingentEndpoints();
         app.MapGraphQL();         // http://localhost:5080/graphql
         app.Run();
         app.Logger.LogInformation($"Close connection to {databaseName}...");

@@ -188,6 +188,47 @@ public class Query
 }
 ----
 
+=== Codierung von IDs mit dem UseHashedIdAttribute
+
+Im Eventmanager haben wir zusätzlich die Klasse _UseHashedIdAttribute_ implementiert.
+Diese Klasse erbt von _ObjectFieldDescriptorAttribute_ und übersetzt den internen Integer-Wert der ID in einen codierten Hash-String.
+Wir verwenden diese Klasse als Attribut in der Basisklasse _Model/Entity.cs_ direkt über der Eigenschaft _Id_.
+Das ist besonders wichtig, damit die _int_ ID bei Abfragen automatisch durch den Konverter codiert wird.
+Dadurch erscheint die ID im generierten GraphQL-Schema sicher und typisiert als _String!_.
+Hier ist der entsprechende Code aus der Basisklasse _Entity_:
+
+.link:{github_url}/Eventmanager/Eventmanager.Application/Model/Entity.cs[→ Entity.cs]
+
+[source,csharp]
+----
+public abstract class Entity
+{
+    [UseHashedId]
+    public int Id { get; set; }
+}
+----
+
+Und hier ist die vollständige Implementierung des Attributs, das die Konvertierung bei der Schema-Generierung durchführt:
+
+.link:{github_url}/Eventmanager/Eventmanager.Application/GraphQL/UseHashedIdAttribute.cs[→ UseHashedIdAttribute.cs]
+[source,csharp]
+----
+public class UseHashedIdAttribute : ObjectFieldDescriptorAttribute
+{
+    protected override void OnConfigure(
+        IDescriptorContext context, IObjectFieldDescriptor descriptor, MemberInfo member)
+    {
+        descriptor
+            .Type<NonNullType<StringType>>()  // int to string
+            .Resolve(ctx =>
+            {
+                var entity = ctx.Parent<Entity>();
+                return Id.From(entity.Id).EncodedValue;
+            });
+    }
+}
+----
+
 == Abfragebeispiele in Bezug auf das Programm
 
 Wenn du das Projekt startest und im Browser _http://localhost:5080/graphql_ öffnest, landest du in **Banana Cake Pop**, der integrierten GraphQL-IDE von HotChocolate.
