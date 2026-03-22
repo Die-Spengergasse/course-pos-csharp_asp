@@ -1,0 +1,28 @@
+= Arbeit mit dem Buch
+:source-highlighter: rouge
+:icons: font
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::github_url[:github_url: ..]
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+Dieses Buch ist ein PDF Export des Kurses von *https://github.com/Die-Spengergasse/course-pos-csharp_asp*.
+Lade immer die neueste Version von link:https://github.com/Die-Spengergasse/course-pos-csharp_asp/raw/refs/heads/main/asp_book.pdf[→ diesem Link].
+
+Jedes Kapitel ist auch im Kurs als online Version enthalten.
+Die *Übungsbeispiele* sind in den einzelnen Kapitel nur in der online Version sichtbar.
+Zusätzlich gibt es im Kurs auf github zusätzliche Übungen.
+
+*Autor:* +
+Michael Schletz +
+HTBLVA Spengergasse +
+Spengergasse 20 +
+1050 Wien

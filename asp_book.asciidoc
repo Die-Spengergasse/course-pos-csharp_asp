@@ -24,6 +24,8 @@ endif::[]
 
 toc::[]
 
+include::asp_book_intro.adoc[tag=!pdf_exclude]
+
 :root_dir: 01_Rest
 include::./{root_dir}/README.adoc[tag=!pdf_exclude]
 
