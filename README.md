@@ -45,10 +45,11 @@ Lade von https://visualstudio.microsoft.com/de/downloads/ die *Enterprise* Versi
 Falls du unter macOS arbeitest, stelle sicher, dass du die neueste Rider Installation besitzt, die .NET 10 unterstützt.
 
 Wähle im Installer den Workload *ASP.NET* and web development_ aus.
+Wenn du das Feature der [AOT Kompilierung](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot) nutzen möchtest, musst du _Desktop development with C++_ aktivieren.
 Installiere unter *Individual options* zusätzlich die .NET 8 Runtime, um ältere Projekte ausführen zu können.
 Unter *Language packs* wähle das englische Sprachpaket.
 
-![](vs2026_installer_2041.png)
+![](vs2026_installer_0856.png)
 
 Starte nach der Installation Visual Studio 2026.
 Du kannst mit *Help* - *Register Visual Studio* den Key eingeben.
