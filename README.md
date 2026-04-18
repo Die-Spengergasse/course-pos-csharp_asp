@@ -38,6 +38,7 @@ Mit ○ gekennzeichnete Kapitel sind Erweiterungskapitel.
 ### Übungen
 
 - [Übungsprüfung zu Services und RESTful API: Sprachwochenverwaltung](./Uebungen/01_Languageweek/README.adoc)
+- [PLF vom 15.4.2026 zu Services und RESTful API: Benzinpreise](./Uebungen/02_GasManager/Angabe.adoc)
 
 ### Installation von Visual Studio 2026
 
