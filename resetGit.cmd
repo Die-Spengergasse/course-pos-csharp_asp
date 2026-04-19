@@ -4,4 +4,4 @@ echo Achtung: Alle lokalen Änderungen werden zurückgesetzt. Drücke CTRL+C zum
 pause
 git add -A
 git fetch --all
-git reset --hard origin/master
+git reset --hard origin/main
