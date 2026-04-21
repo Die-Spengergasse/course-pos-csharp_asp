@@ -37,7 +37,7 @@ Content-Type: application/json
 {
   "languageweekId": 999,
   "studentId": 10,
-  "registerDate": "2026-03-20T10:00:00Z"
+  "registerDate": "2036-03-20T10:00:00Z"
 }
 
 ### HTTP 400: Student id not found.
@@ -47,7 +47,7 @@ Content-Type: application/json
 {
   "languageweekId": 4,
   "studentId": 999,
-  "registerDate": "2026-03-20T10:00:00Z"
+  "registerDate": "2036-03-20T10:00:00Z"
 }
 
 ### HTTP 400: Registration date is in the past.
