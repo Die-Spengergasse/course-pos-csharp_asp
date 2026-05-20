@@ -1,0 +1,293 @@
+= PLF in Programmieren und Software Engineering
+:source-highlighter: rouge
+:icons: font
+:pdf-page-header: true
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+
+____
+[.lead]
+Klasse: 6AAIF und 6CAIF +
+Datum: DI, 19. Mai 2026 +
+Arbeitszeit: 3 UE
+____
+
+== Wichtiger Hinweis vor Arbeitsbeginn
+
+Auf dem Laufwerk _Z_ finden Sie die Datei _link:Plf6xaif_20260519.7z[Plf6xaif_20260519.7z]_.
+Klicken Sie mit der rechten Maustaste auf die Datei und wählen Sie _Weitere Optionen_ -> _7-Zip_ -> _Extract here_.
+Gehen Sie dann in den Ordner _Plf6xaif_ und starten Sie die Datei _start_solution.cmd_.
+Diese Datei lädt zuerst alle Dependencies aus dem Internet und startet dann das Projekt in diesem Ordner.
+Sie müssen das Programm nicht abgeben, denn Sie arbeiten direkt am Netzlaufwerk.
+
+[WARNING]
+====
+Füllen Sie die Datei _README.md_ in _Plf6xaif/README.md_ mit Ihren Daten (Klasse, Name und Accountname) aus.
+*Falls Sie dies nicht machen, kann Ihre Arbeit nicht zugeordnet und daher nicht bewertet werden!*
+====
+
+== Domain Model (alle Aufgaben)
+
+Das folgende Modell beschreibt ein vereinfachtes System für ein Entleihsystem der Schule.
+SchülerInnen und Lehrende (_Person_) können sich Gegenstände (_InventoryItem_) direkt im ZID ausleihen.
+Dafür wird ein Datensatz in _Reservation_ angelegt.
+Die Werte _returnDate_ und _acceptedBy_ werden bei der Rückgabe gesetzt und sind vorher _null_.
+Es wird auch gespeichert, welche/r MitarbeiterIn (_Staff_) das Gerät zurücknimmt.
+Der Status ist eine Lookup Tabelle mit den Werten _Pending_ (Rückgabe ausständig), _Issued_ (ausgegeben) und _Damaged return_ (beschädigt zurückgegeben).
+
+image::https://www.plantuml.com/plantuml/svg/fPFRQW8n48Rlzod2NbQKzbQAU6WB2oBIxGl4tT4Dv239h5HAtxqJGtHJPR7K6vDl3l_C7vqwv1PR9RD6rC10xV78561ZQfTbbUJEiH8vjevzPOm-Ww9cOrPeX1tOG3xW4ucLQ8NU1VGE3ko1ep3QZPV2uNE7JBBls7h1gO-nnpyrzt6DL5KWA4V1aq2X3nVQaLY3TKQJm7NxmPkm3bTSGLTXiEGtO5arniY5RvdmLyM5JCYwCJgfJToWG8yVPFLs--zPxzTBJBkjMu8LNAvQjG6RgFYIA-due0JZyPJhPWVoYM-aJv-Jay3rlQEcG-QFez53peP3bZ_bxAp7g3gVdEzvtB3JxFP-uVT1B1myIWN7gKidrmtNBwH4CVyL5i7M_eQpge8zGZqdFyBRUXh-Ju7G8VCxTiTCDmn9SRzmotlpIIQcNmReAmcRnvfmwyjF_GbbAIJxfw3hLiaV[]
+
+link:https://www.plantuml.com/plantuml/uml/fPFRQW8n48Rlzod2NbQKzbQAU6WB2oBIxGl4tT4Dv239h5HAtxqJGtHJPR7K6vDl3l_C7vqwv1PR9RD6rC10xV78561ZQfTbbUJEiH8vjevzPOm-Ww9cOrPeX1tOG3xW4ucLQ8NU1VGE3ko1ep3QZPV2uNE7JBBls7h1gO-nnpyrzt6DL5KWA4V1aq2X3nVQaLY3TKQJm7NxmPkm3bTSGLTXiEGtO5arniY5RvdmLyM5JCYwCJgfJToWG8yVPFLs--zPxzTBJBkjMu8LNAvQjG6RgFYIA-due0JZyPJhPWVoYM-aJv-Jay3rlQEcG-QFez53peP3bZ_bxAp7g3gVdEzvtB3JxFP-uVT1B1myIWN7gKidrmtNBwH4CVyL5i7M_eQpge8zGZqdFyBRUXh-Ju7G8VCxTiTCDmn9SRzmotlpIIQcNmReAmcRnvfmwyjF_GbbAIJxfw3hLiaV[PlantUML Source]
+
+=== Musterdaten
+
+Im Ordner _datafiles_ sind die bereitgestellten Musterdaten im TSV Format.
+Sie können die Textdateien in Ihrer IDE betrachten.
+
+== Aufgabe 1: Abfragen und Servicemethoden (14 Punkte)
+
+In der Datei _BaseModel/Infrastructure/ReservationContext.cs_ steht ein vollständig implementierter DbContext zur Verfügung.
+Das Model ist bereits in _BaseModel/Model_ implementiert.
+*Sie müssen keine Implementierung des Modelles vornehmen, sondern es in Ihren Servicemethoden verwenden.*
+Führen Sie Ihre Implementierungen in **_Aufgabe1/ReservationService.cs_** durch.
+Verwenden Sie den über Dependency Injection bereitgestellten _ReservationContext_.
+
+
+=== Implementierung der Servicemethoden
+
+Es sind folgende Abfragen und Servicemethoden zu implementieren:
+
+==== List<CategoryWithCount> GetCategoriesWithCount()
+
+Geben Sie alle Kategorien (_Category_) sowie die Anzahl der darin enthaltenen _InventoryItem_ Datensätze zurück.
+Als Rückgabetyp steht Ihnen der folgende Record zur Verfügung.
+
+[source,csharp]
+----
+public record CategoryWithCount(string Text, int Count);
+----
+
+==== List<Person> GetPersonsWithOpenReservations()
+
+Geben Sie alle Personen zurück, die (mindestens) eine offene Reservierung besitzen.
+Sie erkennen offene Reservierungen daran, dass das Feld _returnDate_ den Wert _null_ hat.
+
+==== List<InventoryItem> GetInventoryItemsWithoutReservations(int year)
+
+Geben Sie alle Gegenstände (_InventoryItem_) zurück, die im übergebenen Jahr _nicht_ ausgeliehen wurden, d. h. für die es keinen Datensatz in _Reservation_ für dieses Jahr gibt.
+
+Hinweis: Verwenden Sie das Property _Year_ von _DateOnly_.
+
+==== Reservation AddReservation(int personId, int inventoryItemId, DateOnly loanDate)
+
+Diese Methode soll eine Reservierung (_Reservation_) anlegen.
+Dabei sind folgende Randbedingungen zu prüfen:
+
+* Ist der Parameter _personId_ ungültig, d. h. es gibt keine entsprechende Person in der Datenbank, werfen Sie eine _ReservationException_ mit dem Text _Invalid person._.
+* Ist der Parameter _inventoryItemId_ ungültig, d. h. es gibt kein entsprechendes _InventoryItem_ in der Datenbank, werfen Sie eine _ReservationException_ mit dem Text _Invalid inventory item._.
+* Ist der Wert in _InventoryItem.isAvailable_ auf _false_ gesetzt, werfen Sie eine _ReservationException_ mit dem Text _Item not available._.
+
+Werden alle Bedingungen erfüllt, sollen Sie ein neues _Reservation_ Objekt anlegen und in der Datenbank speichern.
+Verwenden Sie den Status mit dem Text _Pending_ beim Erstellen der Reservierung.
+Die Werte _returnDate_ und _acceptedBy_ sind natürlich _null_.
+
+=== Testen Ihrer Implementierung
+
+Im Musterprojekt befinden sich in _Aufgabe1.Test/Aufgabe1MasterTests_ vordefinierte Tests, die Ihre Implementierung testen.
+Sie müssen keine eigenen Unittests verfassen.
+
+== Aufgabe 2a: Erstellen einer RESTful API (18 Punkte)
+
+Im Projekt _Aufgabe2_ steht Ihnen eine Klasse _InventoryItemsController_ zur Verfügung.
+Diese Klasse bekommt über Dependency Injection ein vorgegebenes Service (_InventoryService_).
+*Verwenden Sie dieses vorgegebene Service; Sie müssen nicht Ihren Service von Aufgabe 1 verwenden.*
+
+Das Service hat 3 Methoden bzw. Properties:
+
+`IQueryable<InventoryItem> InventoryItems`::
+Liefert eine Liste aller in der Datenbank befindlichen Geräte (_InventoryItem_).
+Wird für die GET-Methode im Controller verwendet.
+
+`Task<InventoryItem> AddInventoryItem(AddInventoryItemCmd cmd)`::
+Legt ein _InventoryItem_ auf Basis des übergebenen Commands an und gibt dieses zurück.
+Wirft _InventoryServiceException_, wenn die Daten nicht eingefügt werden können.
+
+`Task UpdateAvailability(UpdateAvailabilityCmd cmd)`::
+Aktualisiert die Verfügbarkeit eines Gerätes auf Basis des übergebenen Commands.
+Wirft _InventoryNotFoundException_, wenn das _inventory item_ nicht gefunden wurde.
+Wirft _InventoryServiceException_, wenn die Daten nicht aktualisiert werden können.
+
+=== Zu implementierende Endpunkte
+
+==== GET /inventoryItems?withReservations=(true|false)
+
+Diese REST API Route soll eine Liste aller Gegenstände (_InventoryItem_) zurückgeben.
+Ist der Query Parameter _withReservations_ auf _true_ gesetzt, so ist im Datensatz die Liste der Reservierungen dieses Gegenstandes zurückzugeben.
+Ist der Parameter auf _false_ gesetzt, ist ein leeres Array (_[]_) bei _reservations_ auszugeben.
+Für die Rückgabe steht ihnen folgender Record zur Verfügung:
+
+[source,csharp]
+----
+public record InventoryItemWithReservationsDto(
+  int Id, string SerialNumber, string ItemName,
+  List<ReservationDto> Reservations);
+
+public record ReservationDto(
+  int Id, DateOnly LoanDate, DateOnly? ReturnDate,
+  string PersonFirstName, string PersonLastName);
+----
+
+.Erwartete HTTP-Antworten:
+[%header,cols="1,5"]
+|===
+| HTTP Status | Bedingung
+| 200	| Ein Array von _InventoryItemWithReservationsDto_ Objekten mit allen Gegenständen und Reservierungen, je nach gesetztem Parameterwert.
+|===
+
+==== GET /inventoryItems/{id}
+
+Diese REST API Route soll das inventory item mit der übergebenen ID liefern.
+
+Für die Rückgabe steht ihnen folgender Record zur Verfügung:
+
+[source,csharp]
+----
+public record InventoryItemDto(int Id, string SerialNumber, string ItemName);
+----
+
+
+.Erwartete HTTP-Antworten:
+[%header,cols="1,5"]
+|===
+| HTTP Status | Bedingung
+| 200	| Ein (1) _InventoryItemDto_ Objekt mit den entsprechenden Daten.
+| 404	| Die ID wurde nicht gefunden.
+|===
+
+==== POST /inventoryItems
+
+Diese REST API Route soll einen neuen InventoryItem Datensatz anlegen.
+Als command object steht Ihnen folgender Record zur Verfügung:
+
+[source,csharp]
+----
+public record AddInventoryItemCmd(
+    string SerialNumber, string ItemName,
+    int CategoryId, bool IsAvailable);
+----
+
+Achten Sie bei der Validierung auf folgende Regeln:
+
+- _SerialNumber_ und _ItemName_ sind Strings mit der Länge zwischen 1 und 255 Zeichen.
+- _CategoryId_ hat als Mindestwert 1.
+
+Bei Validierungsfehlern oder Fehlern der Business Logik sollen Sie HTTP 400 (bad request) mit RFC problem detail body senden.
+
+Wurde der Datensatz erfolgreich eingefügt, senden Sie HTTP 201 Created.
+Im Payload soll die ID des neu angelegten _inventory item_ Objektes mit dem Property _id_ an den Client gesendet werden.
+Senden Sie im Location Header die Adresse der entsprechenden GET Methode dieser Ressource (_GET /inventoryItems/{id}_).
+
+.Erwartete HTTP-Antworten:
+[%header,cols="1,5"]
+|===
+| HTTP Status | Bedingung
+| 201	| Das inventory item konnte angelegt werden.
+| 400	| Ein Validierungs- oder Servicefehler ist aufgetreten (z. B. eine nicht vorhandene _CategoryId_).
+|===
+
+==== PATCH /inventoryItems/{id}/available
+
+Diese REST API Route soll das Feld _isAvailable_ in _InventoryItem_ aktualisieren.
+Über den Routingparameter bekommen Sie die ID des _InventoryItem_ Datensatzes.
+Als Command Object steht Ihnen folgender Record zur Verfügung:
+
+[source,csharp]
+----
+public record UpdateAvailabilityCmd(int Id, bool IsAvailable);
+----
+
+Der Request Body enthält das vollständige Command Object, also die Felder _id_ und _isAvailable_.
+Vergleichen Sie die ID aus dem Routingparameter mit dem Property _Id_ des Command Objects.
+Stimmen die beiden Werte nicht überein, senden Sie HTTP 400 (bad request) mit dem Text _Invalid ID._ im RFC problem detail body.
+
+Wird die ID nicht in _InventoryItem_ gefunden, sollen Sie HTTP 404 (not found) mit RFC problem detail body senden.
+
+.Erwartete HTTP-Antworten:
+[%header,cols="1,5"]
+|===
+| HTTP Status | Bedingung
+| 204	| Das Flag _IsAvailable_ konnte aktualisiert werden.
+| 400	| Die ID aus dem Routingparameter und das Property _Id_ im Command Object stimmen nicht überein.
+| 404	| Die ID wurde nicht gefunden.
+|===
+
+=== HTTP-File zum Testen Ihrer Implementierung
+
+In der Datei _Aufgabe2.http_ im Projekt _Aufgabe2_ steht Ihnen ein HTTP-File zur Verfügung.
+Sie können es verwenden, um Ihre Implementierung manuell zu prüfen.
+
+== Aufgabe 2b: Erstellen von End-to-End (Integration) Tests (6 Punkte)
+
+Verfassen Sie im Projekt _Aufgabe2.Test_ in der Klasse _InventoryItemsControllerTests_ Integration-Tests, die den Endpunkt _POST /inventoryItems_ testen.
+**Es sind keine anderen Endpunkte zu testen.**
+
+Erstellen Sie Tests für die folgenden Szenarien:
+
+* _POST /inventoryItems_ kann mit gültigen Daten den Datensatz anlegen und liefert HTTP 201 Created.
+  Prüfen Sie, ob der korrekte Statuscode geliefert wird und ob der Datensatz in der Datenbank angelegt wurde.
+* _POST /inventoryItems_ kann den Datensatz nicht anlegen, da keine Kategorie mit dieser ID vorhanden ist.
+  Prüfen Sie, ob der korrekte Statuscode geliefert wird.
+
+== Bewertung
+
+[%header,cols="10a,^1a,^1a",format=tsv]
+|===
+Aufgabe 1  (14 Punkte in Summe)	Ges	Pkt.
+Die Methode getCategoriesWithCount ist korrekt.	2	{nbsp}
+Die Methode getPersonsWithOpenReservations ist korrekt.	3	{nbsp}
+Die Methode getInventoryItemsWithoutReservations ist korrekt.	3	{nbsp}
+Die Methode addReservation prüft personId korrekt.	1	{nbsp}
+Die Methode addReservation prüft inventoryItemId korrekt.	1	{nbsp}
+Die Methode addReservation prüft isAvailable korrekt.	1	{nbsp}
+Die Methode addReservation erstellt eine korrekte Reservierung in der Datenbank.	3	{nbsp}
+|===
+
+
+[%header,cols="10a,^1a,^1a",format=tsv]
+|===
+Aufgabe 2 (24 Punkte in Summe)	Ges	Pkt.
+GET /inventoryItems liefert HTTP 200.	1	{nbsp}
+GET /inventoryItems liefert die korrekten Daten bei withReservations=false	2	{nbsp}
+GET /inventoryItems liefert die korrekten Daten bei withReservations=true	2	{nbsp}
+GET /inventoryItems/{id} liefert HTTP 200.	1	{nbsp}
+GET /inventoryItems/{id} liefert die korrekten Daten.	2	{nbsp}
+
+POST /inventoryItems liefert HTTP 201 im Erfolgsfall.	1	{nbsp}
+POST /inventoryItems sendet im Erfolgsfall den korrekten Location Header.	1	{nbsp}
+POST /inventoryItems sendet im Erfolgsfall den korrekten Payload.	1	{nbsp}
+POST /inventoryItems legt die Daten in der Datenbank an.	1	{nbsp}
+POST /inventoryItems liefert HTTP 400 bei ungültigen Werten in _SerialNumber_, _ItemName_ oder _CategoryId_.	1	{nbsp}
+POST /inventoryItems liefert HTTP 400 bei nicht vorhandener _CategoryId_.	1	{nbsp}
+
+
+PATCH /inventoryItems/{id}/available liefert HTTP 204 im Erfolgsfall.	1	{nbsp}
+PATCH /inventoryItems/{id}/available ändert die Daten in der Datenbank korrekt.	1	{nbsp}
+PATCH /inventoryItems/{id}/available liefert HTTP 400, wenn Routing-ID und Command-ID nicht übereinstimmen.	1	{nbsp}
+PATCH /inventoryItems/{id}/available liefert HTTP 404, wenn die ID nicht gefunden wurde.	1	{nbsp}
+
+Der Integration Test für POST prüft HTTP 201 und läuft durch.	2	{nbsp}
+Der Integration Test für POST prüft die Daten der Datenbank und läuft durch.	2	{nbsp}
+Der Integration Test für POST prüft HTTP 400 bei ungültiger Kategorie ID und läuft durch.	2	{nbsp}
+|===
+
+38 - 34 Punkte: Sehr gut, 33 - 29 Punkte: Gut, 28 - 24: Befriedigend, 23 - 19 Punkte: Genügend
