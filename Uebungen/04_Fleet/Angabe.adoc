@@ -1,0 +1,267 @@
+= PLF in Programmieren und Software Engineering
+:source-highlighter: rouge
+:icons: font
+:pdf-page-header: true
+:lang: DE
+:hyphens:
+:figure-caption!:
+ifndef::env-github[:icons: font]
+ifdef::env-github[]
+:caution-caption: :fire:
+:important-caption: :exclamation:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+endif::[]
+
+
+____
+[.lead]
+Klasse: 6AKIF +
+Datum: MI, 27. Mai 2026 +
+Arbeitszeit: 3 UE
+____
+
+== Wichtiger Hinweis vor Arbeitsbeginn
+
+Auf dem Laufwerk _Z_ finden Sie die Datei _link:Plf6akif_20260527.7z[Plf6akif_20260527.7z]_.
+Klicken Sie mit der rechten Maustaste auf die Datei und wählen Sie _Weitere Optionen_ -> _7-Zip_ -> _Extract here_.
+Gehen Sie dann in den Ordner _Plf6akif_ und starten Sie die Datei _start_solution.cmd_.
+Diese Datei lädt zuerst alle Dependencies aus dem Internet und startet dann das Projekt in diesem Ordner.
+Sie müssen das Programm nicht abgeben, denn Sie arbeiten direkt am Netzlaufwerk.
+
+[WARNING]
+====
+Füllen Sie die Datei _README.md_ in _Plf6akif/README.md_ mit Ihren Daten (Klasse, Name und Accountname) aus.
+*Falls Sie dies nicht machen, kann Ihre Arbeit nicht zugeordnet und daher nicht bewertet werden!*
+====
+
+== Domain Model (alle Aufgaben)
+
+Das folgende Modell beschreibt ein System für das Flottenmanagement eines Robotaxi-Anbieters.
+Kunden (_Customer_) können Fahrten (_Ride_) mit autonomen Fahrzeugen (_Vehicle_) buchen.
+Der Wert _EndTime_ wird bei Abschluss der Fahrt gesetzt und ist vorher _null_.
+Der Zustand eines Fahrzeugs wird über die Lookup-Tabelle _Status_ verwaltet (Werte: _Available_, _Maintenance_, _InRide_).
+
+image::https://www.plantuml.com/plantuml/svg/bP7DQiCm383lUGhZuqhBTWsZw_epAEl6MCVk8XQjm7QAhGpAsBilMcrAqlImdAmlaZ_9caM6m8spnPuCAdG7FYg7lAzDB8hAGengoy1DLD-5Qh_HsgXIhJtZ3iE9l8B3bcqvaD-Tq2VkgR8OIxMXoFSfd1O_-Sv4Ncg3zbytpu4Pmt411wY8Z_sAB5PNpOicSkqmYFN2ENgY4Bcl7MrW0AuSaEsGTp9dimIN0mzRDrIXZ_XcWRkEq_kKdUSIlewF5TEN9C_hsY9ueMbHPThOzPPoC_fsChdHQZnM-avtTwBQ8ZrLVu4UBaYQb9eYdGSMsV2qUGCjpKV1oN6UDeqK-8ESu2Kmob7uofiUVH2yfCZWAtnsyWShSc1bO6ccrtnMv_Pph8UISsyfDuMwcA4tZRE_[]
+
+=== Musterdaten
+
+Im Ordner _datafiles_ sind die bereitgestellten Musterdaten im TSV Format.
+Sie können die Textdateien in Ihrer IDE betrachten.
+
+== Aufgabe 1: Abfragen und Servicemethoden (14 Punkte)
+
+In der Datei _BaseModel/Infrastructure/FleetContext.cs_ steht ein vollständig implementierter DbContext zur Verfügung.
+Das Model ist bereits in _BaseModel/Model_ implementiert.
+*Sie müssen keine Implementierung des Modelles vornehmen, sondern es in Ihren Servicemethoden verwenden.*
+Führen Sie Ihre Implementierungen in **_Aufgabe1/FleetService.cs_** durch.
+Verwenden Sie den über Dependency Injection bereitgestellten _FleetContext_ und den _TimeProvider_.
+
+=== Implementierung der Servicemethoden
+
+Es sind folgende Abfragen und Servicemethoden zu implementieren:
+
+==== List<VehicleModelStatsDto> GetModelStats()
+
+Geben Sie alle Fahrzeugmodelle (_VehicleModel_) sowie die Anzahl der aktiven (_IsActive == true_) Fahrzeuge dieses Modells zurück.
+Führen Sie hierbei eine Projektion auf folgenden Record durch.
+
+[source,csharp]
+----
+public record VehicleModelStatsDto(string ModelName, int ActiveVehicleCount);
+----
+
+==== List<CustomerDto> GetCustomersWithOpenRides()
+
+Geben Sie alle Kunden zurück, die aktuell eine laufende Fahrt haben.
+Sie erkennen laufende Fahrten daran, dass das Feld _EndTime_ den Wert _null_ hat.
+Führen Sie eine Projektion auf folgenden Record durch.
+
+[source,csharp]
+----
+public record CustomerDto(int Id, string FullName); // FullName = FirstName + " " + LastName
+----
+
+==== List<Vehicle> GetVehiclesWithRecentRides(int days)
+
+Geben Sie alle Fahrzeuge (_Vehicle_) zurück, die in den letzten _days_ Tagen mindestens eine Fahrt begonnen haben.
+Verwenden Sie zwingend die _Any()_ Methode für die Überprüfung.
+Beziehen Sie die aktuelle Zeit über die _GetUtcNow()_ Methode des injizierten _TimeProvider_.
+
+[NOTE]
+Verwenden Sie `timeProvider.GetUtcNow().UtcDateTime`, um vom TimeProvider die aktuelle UTC Zeit abzurufen. Verwenden Sie die Methode `DateTime.AddDays(n)` mit negativem n, um Tage zu subtrahieren.
+
+==== Ride StartRide(int vehicleId, int customerId)
+
+Diese Methode soll eine neue Fahrt (_Ride_) anlegen.
+Dabei sind folgende Randbedingungen zu prüfen:
+
+* Ist der Parameter _customerId_ ungültig, werfen Sie eine _FleetException_ mit dem Text _Invalid customer._
+* Ist der Parameter _vehicleId_ ungültig, werfen Sie eine _FleetException_ mit dem Text _Invalid vehicle._
+* Ist das Fahrzeug inaktiv (_IsActive == false_) oder der Status nicht _Available_, werfen Sie eine _FleetException_ mit dem Text _Vehicle not available._
+
+Werden alle Bedingungen erfüllt, sollen Sie ein neues _Ride_ Objekt anlegen und in der Datenbank speichern.
+Setzen Sie _StartTime_ auf den aktuellen Zeitpunkt des _TimeProvider_ (`timeProvider.GetUtcNow().UtcDateTime`).
+Setzen Sie den Status des Fahrzeugs auf den Status mit dem Namen _InRide_.
+
+=== Testen Ihrer Implementierung
+
+Im Musterprojekt befinden sich in _Aufgabe1.Test/Aufgabe1MasterTests_ vordefinierte Tests, die Ihre Implementierung prüfen.
+Sie müssen keine eigenen Unittests verfassen.
+
+== Aufgabe 2a: Erstellen einer RESTful API (18 Punkte)
+
+Im Projekt _Aufgabe2_ steht Ihnen eine Klasse _VehiclesController_ zur Verfügung.
+Diese Klasse bekommt über Dependency Injection ein vorgegebenes Service (_VehicleService_).
+*Verwenden Sie dieses vorgegebene Service; Sie müssen nicht Ihren Service von Aufgabe 1 verwenden.*
+
+Das Service hat 3 Methoden bzw. Properties:
+
+`IQueryable<Vehicle> Vehicles`::
+Liefert eine Liste aller in der Datenbank befindlichen Fahrzeuge (_Vehicle_).
+
+`Task<Vehicle> AddVehicle(AddVehicleCmd cmd)`::
+Legt ein _Vehicle_ auf Basis des übergebenen Commands an und gibt dieses zurück.
+
+`Task DeleteVehicle(int id)`::
+Löscht das Fahrzeug mit der entsprechenden ID.
+Wirft _VehicleNotFoundException_, wenn das _Vehicle_ nicht gefunden wurde.
+Wirft _InvalidOperationException_, wenn das Fahrzeug noch Fahrten zugewiesen hat.
+
+=== Zu implementierende Endpunkte
+
+==== GET /vehicles?onlyActive=(true|false)
+
+Diese REST API Route soll eine Liste aller Fahrzeuge zurückgeben.
+Ist der Query Parameter _onlyActive_ auf _true_ gesetzt, so sind nur Fahrzeuge mit _IsActive == true_ zurückzugeben.
+Binden Sie den Parameter korrekt mit _[FromQuery]_.
+Für die Rückgabe steht ihnen folgender Record zur Verfügung:
+
+[source,csharp]
+----
+public record VehicleListDto(int Id, string LicensePlate, string ModelName, string StatusName);
+----
+
+.Erwartete HTTP-Antworten:
+[%header,cols="1,5"]
+|===
+| HTTP Status | Bedingung
+| 200	| Ein Array von _VehicleListDto_ Objekten mit allen oder nur den aktiven Fahrzeugen.
+|===
+
+==== GET /vehicles/{id}
+
+Diese REST API Route soll das Fahrzeug mit der übergebenen ID liefern.
+Binden Sie die ID korrekt mit _[FromRoute]_.
+Für die Rückgabe steht ihnen der bereits definierte Record _VehicleListDto_ zur Verfügung.
+
+.Erwartete HTTP-Antworten:
+[%header,cols="1,5"]
+|===
+| HTTP Status | Bedingung
+| 200	| Ein _VehicleListDto_ Objekt mit den entsprechenden Daten.
+| 404	| Die ID wurde nicht gefunden.
+|===
+
+==== POST /vehicles
+
+Diese REST API Route soll einen neuen _Vehicle_ Datensatz anlegen.
+Als Command Object steht Ihnen folgender Record zur Verfügung, den Sie um Validierungslogik erweitern müssen:
+
+[source,csharp]
+----
+public record AddVehicleCmd(
+    string LicensePlate, int ModelId, bool IsActive, decimal InitialMileage) : IValidatableObject
+----
+
+Achten Sie bei der Validierung auf folgende Regeln:
+
+- _LicensePlate_ muss zwingend angegeben werden und darf maximal 15 Zeichen lang sein (verwenden Sie Validation Attributes).
+- _ModelId_ hat als Mindestwert 1 (verwenden Sie Validation Attributes).
+- In der _Validate_ Methode: Wenn _InitialMileage_ größer als 0 ist, darf _IsActive_ nicht _true_ gesetzt sein.
+
+Bei Validierungsfehlern sollen Sie HTTP 400 (bad request) mit RFC problem detail body senden.
+Wurde der Datensatz erfolgreich eingefügt, senden Sie HTTP 201 Created mithilfe von _CreatedAtAction_. Achten Sie auf den korrekten Location Header.
+Im Payload soll die ID des neu angelegten _Vehicle_ Objektes an den Client gesendet werden.
+
+.Erwartete HTTP-Antworten:
+[%header,cols="1,5"]
+|===
+| HTTP Status | Bedingung
+| 201	| Das Fahrzeug konnte angelegt werden.
+| 400	| Ein Validierungs- oder Servicefehler ist aufgetreten.
+|===
+
+==== DELETE /vehicles/{id}
+
+Diese REST API Route soll ein _Vehicle_ aus der Datenbank löschen.
+Verwenden Sie die Methode des Services und fangen Sie die spezifischen Exceptions ab.
+
+.Erwartete HTTP-Antworten:
+[%header,cols="1,5"]
+|===
+| HTTP Status | Bedingung
+| 204	| Das Fahrzeug wurde erfolgreich gelöscht.
+| 400	| Das Fahrzeug konnte nicht gelöscht werden, da noch Fahrten zugewiesen sind (_InvalidOperationException_ des Services).
+| 404	| Die ID wurde nicht gefunden (_VehicleNotFoundException_ des Services).
+|===
+
+=== HTTP-File zum Testen Ihrer Implementierung
+
+In der Datei _Aufgabe2.http_ im Projekt _Aufgabe2_ steht Ihnen ein HTTP-File zur Verfügung.
+Sie können es verwenden, um Ihre Implementierung manuell zu prüfen.
+
+== Aufgabe 2b: Erstellen von End-to-End (Integration) Tests (6 Punkte)
+
+Verfassen Sie im Projekt _Aufgabe2.Test_ in der Klasse _VehiclesControllerTests_ Integration-Tests, die den Endpunkt _POST /vehicles_ testen.
+**Es sind keine anderen Endpunkte zu testen.**
+
+Erstellen Sie Tests für die folgenden Szenarien:
+
+* _POST /vehicles_ kann mit gültigen Daten den Datensatz anlegen und liefert HTTP 201 Created.
+Prüfen Sie, ob der korrekte Statuscode geliefert wird und ob der Datensatz in der Datenbank angelegt wurde.
+
+* _POST /vehicles_ liefert HTTP 400, wenn die logische Überprüfung (_IValidatableObject_) fehlschlägt (z.B. Mileage > 0 und IsActive == true).
+Prüfen Sie, ob der korrekte Statuscode geliefert wird.
+
+== Bewertung
+
+[%header,cols="10a,^1a,^1a",format=tsv]
+|===
+Aufgabe 1 (14 Punkte in Summe)	Ges	Pkt.
+Die Methode GetModelStats ist korrekt und besteht den Unittest.	2	{nbsp}
+Die Methode GetCustomersWithOpenRides ist korrekt und besteht den Unittest.	3	{nbsp}
+Die Methode GetVehiclesWithRecentRides ist korrekt und besteht den Unittest.	3	{nbsp}
+Die Methode StartRide prüft customerId und vehicleId korrekt.	1	{nbsp}
+Die Methode StartRide prüft IsActive und Status korrekt.	2	{nbsp}
+Die Methode StartRide erstellt eine korrekte Fahrt und ändert den Vehicle-Status in der Datenbank.	3	{nbsp}
+|===
+
+[%header,cols="10a,^1a,^1a",format=tsv]
+|===
+Aufgabe 2 (24 Punkte in Summe)	Ges	Pkt.
+GET /vehicles liefert HTTP 200.	1	{nbsp}
+GET /vehicles liefert die korrekten Daten bei onlyActive=false	2	{nbsp}
+GET /vehicles liefert die korrekten Daten bei onlyActive=true	2	{nbsp}
+GET /vehicles/{id} liefert HTTP 200 oder 404.	1	{nbsp}
+GET /vehicles/{id} liefert das korrekt gemappte DTO.	2	{nbsp}
+
+POST /vehicles liefert HTTP 201 im Erfolgsfall.	1	{nbsp}
+POST /vehicles verwendet CreatedAtAction für den korrekten Location Header.	1	{nbsp}
+POST /vehicles sendet im Erfolgsfall den korrekten Payload.	1	{nbsp}
+POST /vehicles ruft den Service zur Erstellung auf.	1	{nbsp}
+POST /vehicles liefert HTTP 400 über Validation Attributes.	1	{nbsp}
+POST /vehicles liefert HTTP 400 über die IValidatableObject Logik.	1	{nbsp}
+
+DELETE /vehicles/{id} liefert HTTP 204 im Erfolgsfall.	1	{nbsp}
+DELETE /vehicles/{id} löscht die Daten in der Datenbank korrekt.	1	{nbsp}
+DELETE /vehicles/{id} liefert HTTP 400 bei InvalidOperationException.	1	{nbsp}
+DELETE /vehicles/{id} liefert HTTP 404 bei VehicleNotFoundException.	1	{nbsp}
+
+Der Integration Test für POST prüft HTTP 201 und läuft durch.	2	{nbsp}
+Der Integration Test für POST prüft die Daten der Datenbank und läuft durch.	2	{nbsp}
+Der Integration Test für POST prüft HTTP 400 bei IValidatableObject Fehler und läuft durch.	2	{nbsp}
+|===
+
+38 - 34 Punkte: Sehr gut, 33 - 29 Punkte: Gut, 28 - 24: Befriedigend, 23 - 19 Punkte: Genügend
