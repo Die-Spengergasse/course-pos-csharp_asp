@@ -41,6 +41,10 @@ Mit ○ gekennzeichnete Kapitel sind Erweiterungskapitel.
 - [PLF vom 15.4.2026 zu Services und RESTful API: Benzinpreise](./Uebungen/02_GasManager/Angabe.adoc)
 - [PLF vom 19.5.2026 zu Services und RESTful API: Inventarverleih](./Uebungen/03_InventoryManager/Angabe.adoc)
 - [PLF vom 27.5.2026 zu Services und RESTful API: Taxiflotte](./Uebungen/04_Fleet/Angabe.adoc)
+- Übungsklausur für September 2026 (AIF und KIF)
+    - [Angabe (PDF)](./Uebungen/05_Probeklausur2026-09/angabe.pdf)
+    - [Bewertungsblatt (PDF)](./Uebungen/05_Probeklausur2026-09/bewertung.pdf)
+    - [Angabenprojekt (.NET 10)](./Uebungen/05_Probeklausur2026-09/SPG_Fachtheorie_Angabe.7z)
 
 ### Installation von Visual Studio 2026
 
