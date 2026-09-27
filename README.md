@@ -45,6 +45,7 @@ Mit ○ gekennzeichnete Kapitel sind Erweiterungskapitel.
     - [Angabe (PDF)](./Uebungen/05_Probeklausur2026-09/angabe.pdf)
     - [Bewertungsblatt (PDF)](./Uebungen/05_Probeklausur2026-09/bewertung.pdf)
     - [Angabenprojekt (.NET 10)](./Uebungen/05_Probeklausur2026-09/SPG_Fachtheorie_Angabe.7z)
+- [Klausur in Fachtheorie vom 21.9.2026 (AIF und KIF)](./Uebungen/06_Klausur_2026-09-21/README.md)
 
 ### Installation von Visual Studio 2026
 
